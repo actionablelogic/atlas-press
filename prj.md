@@ -45,6 +45,9 @@ interface MapDocument {
   };
   projectionId: ProjectionId;
   styleId: StyleId;
+  styleOverrides: StyleDiff;       // user customizations on top of the preset:
+                                   // layer toggles, per-layer colors/widths,
+                                   // per-class typography, background/ocean colors
   overlays: OverlayConfig[];      // graticule, compass, frame, title…
   canvas: {
     aspect: PosterAspect;         // e.g. "2:3", "3:2", "1:1", "ISO A"
@@ -77,7 +80,7 @@ interface MapDocument {
 - Reset button → return to the fitted view of the selected region.
 - Render at reduced detail (110m data, half-res raster) *during* interaction; re-render full quality on idle (debounced). This is essential to keep raster warping smooth.
 
-### 5.3 Projections (curated set of 8, visually distinct)
+### 5.3 Projections (curated set of 9, visually distinct)
 
 Presented as thumbnail cards (each thumbnail = mini render of the current region in that projection).
 
@@ -87,10 +90,13 @@ Presented as thumbnail cards (each thumbnail = mini render of the current region
 | Robinson | The classic "atlas look" (the attached poster's family) | Whole-world posters |
 | Winkel Tripel | National Geographic's choice, balanced distortion | Whole-world |
 | Mollweide | Elliptical, equal-area, "scientific" look | World, thematic |
+| **Hobo–Dyer** | Rectangular equal-area, "fair to all areas" — the anti-Mercator statement map | Whole-world posters |
 | Orthographic | The globe-from-space view | Hero shots of one hemisphere/continent |
 | Azimuthal Equidistant | Polar/radial "UN logo" look | Poles, distance-from-a-point art |
 | Albers Equal-Area Conic | Curved parallels, the "USGS look" | Countries & continents at mid-latitudes; **auto-set standard parallels from region bbox (⅙ rule)** |
 | Stereographic | Conformal, dramatic edge stretch | Poles, artistic hemispheres |
+
+Hobo–Dyer implementation note: it's the Lambert cylindrical equal-area family with standard parallels at **37.5°** — in d3, `geoCylindricalEqualArea().parallel(37.5)`. Since the whole family is one parameter, expose sibling presets cheaply as variants on the same card: Gall–Peters (45°), Behrmann (30°), and optionally a "south-up" toggle (γ = 180°), which is historically part of the Hobo–Dyer's identity. Capability descriptor: rotates λ only.
 
 (Stretch: Waterman Butterfly or Dymaxion-like `airocean` as a "wow" option — note these have interrupted geometry and complicate raster warping and dragging; explicitly out of v1 scope.)
 
@@ -98,9 +104,11 @@ Projection-specific behavior:
 - World pseudo-cylindricals (Robinson, Equal Earth, Winkel, Mollweide) look wrong when rotated in φ (latitude); for these, "centering" only rotates λ and pans vertically. Azimuthals rotate freely in all axes. Conics expose standard-parallel handling automatically. Encode this per-projection as a capability descriptor: `{ rotates: "λ" | "λφ" | "λφγ", supportsStandardParallels: boolean, clipsToSphere: boolean }`.
 - Always draw the **projection outline (sphere boundary)** and clip everything to it.
 
-### 5.4 Styles (v1: 4 styles)
+### 5.4 Styles (v1: 4 presets over a customizable layer system)
 
-A style = (a) which data layers render, (b) their paint rules, (c) optional raster underlay, (d) typography.
+A style is a **preset, not a straitjacket**: it's a saved combination of (a) layer toggles, (b) paint rules, (c) optional raster underlay, (d) typography — all of which the user can then override in a **Customize panel**. Picking a new style preset resets customizations (with a confirm).
+
+**Presets:**
 
 1. **Classic Atlas** (the attached-poster look) — vector.
    - Cream/aged-paper background with subtle noise texture; countries in a muted 5–6 color political palette (use a greedy graph-coloring so neighbors differ); coastline vignette (soft outer glow into the ocean); rivers + lakes; graticule in faint brown; serif labels.
@@ -113,7 +121,35 @@ A style = (a) which data layers render, (b) their paint rules, (c) optional rast
 3. **Terrain** — raster (Natural Earth II with shaded relief & water) + vector borders/rivers/labels.
 4. **Minimal / Blueprint** — vector. Single-line coastlines and borders on a flat background, 2–3 configurable colors. Cheap to build, looks great, popular for posters.
 
-Style definition lives in a declarative JSON-ish spec (layer list + paint props) so adding style #5+ is data, not code.
+Style presets and user overrides both live in the same declarative spec (layer list + paint props + typography), so adding preset #5+ is data, not code, and "user customizations" are just a diff on top of the preset stored in `MapDocument`.
+
+**Customize panel — layer toggles** (each on/off, honoring per-style defaults):
+
+| Layer | Data source | Notes |
+|---|---|---|
+| Country borders | NE admin-0 boundary lines | incl. disputed-boundary styling (dashed) |
+| Country fills / political colors | NE admin-0 polygons | vector styles only |
+| Country names | NE admin-0 labels | |
+| Capitals | NE populated places (`featurecla = Admin-0 capital`) | dot + label, independently toggleable from other cities |
+| Major cities | NE populated places, rank-filtered | |
+| Ocean/sea names | NE marine label points | |
+| Rivers | NE `rivers_lake_centerlines` (110/50/10m) | |
+| Lakes | NE `lakes` | |
+| **Roads** | NE `roads` (**10m only** — major highways; lazy-loaded, ~heavier asset) | Set expectations in the UI: these are intercity major roads, not street networks (street-level is v2). Hidden by default on world-scale views (illegible noise at that scale) |
+| Graticule | generated | also configurable in overlays §5.6 |
+
+Each vector line/fill layer additionally exposes **color** and **stroke width** (in poster-relative units).
+
+**Customize panel — typography**, configurable **per label class** (country names / capitals / cities / ocean names / graticule degree labels), with a "link all" toggle:
+- **Font family**: curated list of ~8 bundled OFL fonts spanning classic-serif (EB Garamond, Playfair), clean-sans (Inter, Archivo), slab, and mono — bundled (not Google-CDN-loaded) so export in a worker is reliable and offline works.
+- **Font size**: a scale multiplier per class (base sizes remain poster-relative so they survive export at any DPI).
+- **Font color**, plus **halo/outline color & width** — essential for legibility on satellite imagery.
+- Letter-spacing and small-caps toggles for that classic-atlas look (country names in the reference poster are tracked-out small caps).
+
+**Customize panel — background & water:**
+- **Background color** = everything outside the projection's sphere/outline. Defaults: paper-cream (Classic), **black (Satellite)** — user-overridable to any color (white, navy, transparent-PNG…). Transparent background is an export option (PNG only).
+- **Ocean color** (vector styles) — distinct from background: on a Robinson map the ellipse interior ocean and the page around the ellipse are different surfaces; both configurable.
+- Raster styles: background color applies outside the sphere; optionally tint/desaturate controls for the raster itself (v1.5, cheap in the shader: brightness/saturation/sepia uniforms).
 
 ### 5.5 Labels (scoped, see Open Questions)
 
@@ -170,23 +206,24 @@ Implementation: decor overlays are SVG/canvas sprites in *poster space*; a light
 
 ## 7. Milestones
 
-1. **M1 — Projection core (the risky part first).** Blank page → Natural Earth land + borders rendered via d3-geo canvas; projection switcher (all 8); versor drag + zoom + fitExtent; per-projection capability descriptors. *Exit test: drag Antarctica to center in Orthographic without visual glitches.*
+1. **M1 — Projection core (the risky part first).** Blank page → Natural Earth land + borders rendered via d3-geo canvas; projection switcher (all 9, incl. Hobo–Dyer via `geoCylindricalEqualArea().parallel(37.5)`); versor drag + zoom + fitExtent; per-projection capability descriptors. *Exit test: drag Antarctica to center in Orthographic without visual glitches.*
 2. **M2 — Region search.** Gazetteer JSON (countries + continents + oceans), combobox, fit-to-region incl. antimeridian cases.
-3. **M3 — Styles: Classic Atlas + Minimal** (vector-only), incl. political coloring, coast vignette, basic labels with decluttering.
-4. **M4a — Raster warping, equirectangular.** WebGL inverse-projection shader sampling a single equirectangular texture; Terrain style + world-scale Satellite; interactive-quality degradation strategy. *Second risky milestone — prototype early.*
-5. **M4b — Raster warping, Mercator tiles.** Tile fetcher (zoom selection, concurrency, IndexedDB cache, attribution plumbing), mosaic texture assembly, Mercator→lon/lat conversion in the shader; pluggable source config + API-key settings UI. *Third risky milestone.* Exit test: crisp A0 export of a single mid-size country in Orthographic from Sentinel-2 tiles.
-6. **M5 — Overlays.** Graticule + edge degree labels; compass, frame, cartouche, text with transform handles.
-7. **M6 — Export.** Tiled high-DPI rendering with streaming PNG/JPEG encode in a worker; SVG export for vector styles; size/DPI dialog with A0+ presets.
-8. **M7 — Polish.** Poster aspect presets, URL sharing, keyboard a11y, mobile-usable read-only preview, attribution footer.
+3. **M3 — Styles: Classic Atlas + Minimal** (vector-only), incl. political coloring, coast vignette, basic labels with decluttering. Style spec must be the declarative preset+diff format from day one.
+4. **M3b — Customize panel.** Layer toggles (borders, fills, names, capitals, cities, rivers, lakes, roads), per-layer color/width, per-class typography (family/size/color/halo), background & ocean colors. Roads = lazy-loaded NE 10m asset. *Exit test: recreate a passable "Minimal" look starting from the Classic Atlas preset using only panel controls.*
+5. **M4a — Raster warping, equirectangular.** WebGL inverse-projection shader sampling a single equirectangular texture; Terrain style + world-scale Satellite; interactive-quality degradation strategy; background-color-outside-sphere plumbed through the raster path. *Second risky milestone — prototype early.*
+6. **M4b — Raster warping, Mercator tiles.** Tile fetcher (zoom selection, concurrency, IndexedDB cache, attribution plumbing), mosaic texture assembly, Mercator→lon/lat conversion in the shader; pluggable source config + API-key settings UI. *Third risky milestone.* Exit test: crisp A0 export of a single mid-size country in Orthographic from Sentinel-2 tiles.
+7. **M5 — Overlays.** Graticule + edge degree labels; compass, frame, cartouche, text with transform handles.
+8. **M6 — Export.** Tiled high-DPI rendering with streaming PNG/JPEG encode in a worker; SVG export for vector styles; size/DPI dialog with A0+ presets.
+9. **M7 — Polish.** Poster aspect presets, URL sharing, keyboard a11y, mobile-usable read-only preview, attribution footer.
 
 Suggested Claude Code approach: one milestone per session/PR; keep a `NOTES.md` of rendering decisions (stroke widths, palettes) since they'll be tuned repeatedly.
 
 ## 8. Data & licensing
 
-- **Natural Earth**: public domain. Ship 110m + 50m always; 10m coastline/borders lazy-loaded (~several MB as TopoJSON, quantized).
+- **Natural Earth**: public domain. Ship 110m + 50m always; 10m coastline/borders lazy-loaded (~several MB as TopoJSON, quantized). **Roads layer exists only at 10m** (`ne_10m_roads`, major intercity routes) — lazy-loaded on toggle.
 - **NASA Blue Marble / visible Earth**: generally free to use incl. commercially, attribution appreciated — verify the exact product page terms.
 - **Natural Earth I/II raster**: public domain.
-- Fonts: OFL-licensed serif (e.g. Playfair Display / EB Garamond) + a utility sans; embed via `@font-face`, and make sure export canvas waits for `document.fonts.ready`.
+- Fonts: curated set of ~8 **OFL-licensed** families (e.g. EB Garamond, Playfair Display, Inter, Archivo, a slab, a mono) bundled locally via `@font-face`; make sure export waits for `document.fonts.ready` (and that worker-side rendering has font access — if using OffscreenCanvas in a worker, load fonts via `FontFace` in the worker too).
 - **High-res satellite tiles are the licensing exception**: EOX Sentinel-2 cloudless is CC-BY-NC-SA (attribution required, **no commercial resale of prints**); Mapbox/Google satellite generally require a specific license for print products; Esri World Imagery requires attribution and has its own terms. The raw Copernicus Sentinel-2 data itself is free for any use — building your own cloudless mosaic from it is a possible (large) future project that would remove all restrictions.
 - Consequence: vector styles, terrain, and Blue Marble world-satellite posters are freely sellable; **region-scale high-res satellite posters are personal-use unless the user brings a commercially-licensed tile source**. Show the active source's license next to the export button.
 
@@ -197,11 +234,20 @@ Suggested Claude Code approach: one milestone per session/PR; keep a `NOTES.md` 
 │  ⌕ [ Search: "Pacific Ocean"        ▾ ]        [Export ⭳]  │
 ├───────────────┬────────────────────────────────────────────┤
 │  PROJECTION   │                                            │
-│  [8 thumbnail │                                            │
+│  [9 thumbnail │                                            │
 │   cards]      │                                            │
 │  ───────────  │            POSTER PREVIEW                  │
 │  STYLE        │     (fixed aspect, drop-shadowed,          │
-│  [4 cards]    │      drag to rotate, scroll to zoom)       │
+│  [4 preset    │      drag to rotate, scroll to zoom)       │
+│   cards]      │                                            │
+│  ───────────  │                                            │
+│  CUSTOMIZE ▸  │                                            │
+│  Layers       │                                            │
+│   ☑ borders   │                                            │
+│   ☑ names ☑ ⚑ │  (capitals)                                │
+│   ☐ roads …   │                                            │
+│  Type  [Aa ▾] │  size / color / halo per class             │
+│  Colors       │  background / ocean / per-layer            │
 │  ───────────  │                                            │
 │  OVERLAYS     │                                            │
 │  ☑ Graticule  │                                            │
@@ -214,6 +260,8 @@ Suggested Claude Code approach: one milestone per session/PR; keep a `NOTES.md` 
 └───────────────┴────────────────────────────────────────────┘
 ```
 
+The Customize panel is collapsed by default so casual users see a simple three-choice tool (region / projection / style) while tinkerers can go deep — this two-tier disclosure is important; don't flatten every option into one wall of controls.
+
 Design direction: the tool itself should feel like a cartographer's workshop desk, not a SaaS dashboard — but keep the chrome quiet so the poster is the hero. Selected projection/style cards show live mini-previews of *your* current region, not canned images.
 
 ## 10. Decisions log (2026-07-03)
@@ -221,6 +269,8 @@ Design direction: the tool itself should feel like a cartographer's workshop des
 1. **Zoom depth**: v1 = world & regions (country level, Natural Earth). City/street level is an explicit **v2** — it will require tiled vector data (e.g. OpenMapTiles/Protomaps) reprojected the same way, and some exotic projections stop making sense at that scale.
 2. **Satellite fidelity**: crisp high-res required → two-tier raster architecture (equirectangular Blue Marble for world scale, Web-Mercator tile warping for region scale). Adds milestone M4b and the licensing constraints in §8.
 3. **Max print size**: A0 and beyond → streaming tile-row export encoder (§5.7), 150–300 DPI options with sensible defaults.
+4. **Granular customization is in scope for v1**: styles are presets + user diff (§5.4) — layer toggles (country names, capitals, cities, rivers, lakes, roads, borders), per-class typography (family/size/color/halo), background & ocean colors. Roads limited to NE 10m major roads in v1 (street networks are v2 with city zoom).
+5. **Hobo–Dyer projection added** (9th card), with Gall–Peters/Behrmann variants and south-up toggle nearly free via the same cylindrical equal-area parameterization.
 
 ## 11. Open questions (remaining)
 
@@ -229,4 +279,4 @@ Design direction: the tool itself should feel like a cartographer's workshop des
 3. **Sticker scope**: is the fixed set (compass, frame, cartouche, text, graticule) enough, or do you want user-uploaded images/SVGs as stickers?
 4. **Ocean list**: which oceans/seas should the gazetteer include beyond the big five? (Mediterranean, Caribbean, South China Sea…? Each is 5 minutes of curation.)
 5. **Monetization/usage**: personal tool, or public? If public and free, hosting is trivial; if you ever want print-on-demand fulfillment, that's a v3 with a backend.
-6. **Color customization**: are style palettes fixed, or should users recolor (ocean color, land palette, line colors)? Cheap to add for Minimal, medium for Classic Atlas, N/A for raster styles.
+6. **Custom font uploads**: the curated 8-font list covers most needs; do you also want users to upload their own font files (licensing is on them; adds file-handling + embedding work, medium effort)?
