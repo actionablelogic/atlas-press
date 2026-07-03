@@ -3,6 +3,54 @@
 Running log of tuning decisions (stroke widths, palettes, projection quirks)
 that will be revisited repeatedly, per the suggestion in `prj.md` §7.
 
+## M4a — Raster warping (equirectangular)
+
+### Why mesh reprojection, not a per-pixel inverse shader
+- A per-pixel fragment shader would need every projection's **inverse** written in
+  GLSL (8 of them; Winkel Tripel/Robinson have only numeric inverses). Instead we
+  invert a **coarse screen grid** on the CPU (`projection.invert` at a few thousand
+  nodes — cheap even for numeric inverses) and let the GPU **bilinearly interpolate**
+  the equirectangular texture across the resulting triangles. One code path covers
+  all 8 projections and any future one automatically.
+- Trade-off: piecewise-linear approximation of the warp. Invisible at grid density
+  110 (idle); a bit looser at 32 (during drag). Density is the quality/perf knob.
+
+### RasterWarper (`render/RasterWarper.ts`)
+- **WebGL2** (not WebGL1) so non-power-of-two textures get `REPEAT` wrap + mipmaps
+  for free — no need to resize the 5400×2700 sources to POT.
+- Equirectangular → uv is linear: `u=(lon+180)/360`, `v=(90-lat)/180`. Upload with
+  `UNPACK_FLIP_Y_WEBGL=0` so texture row 0 = image top = lat +90 (verified upright).
+- Per cell: emit 2 triangles only if all 4 corners inverted to valid lon/lat
+  (off-globe corners → skip → ocean fill shows through, clean sphere edge).
+- **Antimeridian seam:** if a cell's 4 u's straddle the 0/1 boundary (range > 0.5),
+  lift the small ones by +1; `REPEAT` wrap then samples across the seam without a
+  smear or gap.
+- Renders into its own offscreen canvas (transparent clear); renderMap composites
+  it with `ctx.drawImage(...)` **inside the sphere clip**. GL canvas is dpr-scaled;
+  drawImage into the dpr-scaled 2D ctx maps 1:1.
+- Textures load async (`Image`); `onTextureLoad` → host redraw. GL-unsupported or
+  still-loading → `render` returns false → flat ocean fill.
+
+### Styles
+- New `raster` layer type carries `texture: "satellite" | "terrain"`. Raster styles
+  drop political fills/vignette; keep graticule + borders (+ rivers for terrain) +
+  labels. Label color/halo flip per underlay lightness (light text on satellite,
+  dark on terrain) via a shared `rasterLabels()` helper.
+
+### Texture prep (one-time; sharp was uninstalled afterward)
+- Satellite: NASA Blue Marble Next Generation, `world.topo.bathy.200412.3x5400x2700.jpg`
+  (eoimages.gsfc.nasa.gov) → `public/textures/satellite.jpg`.
+- Terrain: Natural Earth II shaded relief + water `NE2_50M_SR_W` (naciscdn.org zip,
+  88 MB TIF) → resized to 5400×2700 JPEG via `sharp` → `public/textures/terrain.jpg`.
+  Regenerate: unzip TIF, then `sharp(tif,{limitInputPixels:false}).resize(5400,2700)
+  .jpeg({quality:82})`.
+- Both public-domain / free-to-use → these raster posters are freely sellable
+  (unlike M4b's licensed Mercator tiles, prj.md §8).
+
+### Headless verification
+- WebGL2 needs SwiftShader flags in headless Chromium:
+  `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist`.
+
 ## M3 — Styles (Classic Atlas + Minimal)
 
 ### Declarative style system (`src/styles/styles.ts`)

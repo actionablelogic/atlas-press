@@ -2,7 +2,9 @@
 // Adding a new style is data (a new StyleDef), not renderer code — the renderer
 // (src/render/renderMap.ts) knows this fixed vocabulary of layer types.
 
-export type StyleId = "classicAtlas" | "minimal";
+import type { TextureId } from "../render/RasterWarper";
+
+export type StyleId = "classicAtlas" | "minimal" | "terrain" | "satellite";
 
 export type LabelKind = "ocean" | "country" | "capital" | "city";
 
@@ -25,6 +27,7 @@ export interface LabelClass {
 export type LayerType =
   | "background"
   | "sphere"
+  | "raster"
   | "graticule"
   | "coastVignette"
   | "countries"
@@ -46,6 +49,7 @@ export interface LayerSpec {
   blur?: number; // coastVignette
   color?: string; // coastVignette glow color
   paper?: boolean; // background: subtle paper texture
+  texture?: TextureId; // raster: equirectangular source
   labelClasses?: LabelClass[];
 }
 
@@ -151,7 +155,70 @@ const MINIMAL: StyleDef = {
   ],
 };
 
-export const STYLES: StyleDef[] = [CLASSIC_ATLAS, MINIMAL];
+// Shared label set for raster styles; color/halo differ per underlay lightness.
+function rasterLabels(text: string, halo: string): LabelClass[] {
+  const font = "'Iowan Old Style', Palatino, Georgia, serif";
+  return [
+    {
+      kind: "ocean",
+      font,
+      sizePx: 14,
+      italic: true,
+      color: text,
+      halo,
+      uppercase: true,
+      letterSpacing: 3,
+      priority: 0,
+    },
+    { kind: "country", font, sizePx: 12, color: text, halo, priority: 1 },
+    {
+      kind: "capital",
+      font,
+      sizePx: 10.5,
+      color: text,
+      halo,
+      minScale: 260,
+      priority: 2,
+    },
+  ];
+}
+
+const TERRAIN: StyleDef = {
+  id: "terrain",
+  label: "Terrain",
+  character: "Natural Earth shaded relief",
+  layers: [
+    { type: "background", fill: "#dfe7e6" },
+    { type: "sphere", fill: "#aac4cc", stroke: "#6b5b3f", lineWidth: 1.2 },
+    { type: "raster", texture: "terrain" },
+    { type: "graticule", stroke: "rgba(70,60,45,0.18)", lineWidth: 0.5, step: 15 },
+    { type: "rivers", stroke: "rgba(70,105,130,0.7)", lineWidth: 0.6 },
+    { type: "borders", stroke: "rgba(60,50,35,0.55)", lineWidth: 0.6 },
+    {
+      type: "labels",
+      labelClasses: rasterLabels("#33302a", "rgba(233,231,222,0.85)"),
+    },
+  ],
+};
+
+const SATELLITE: StyleDef = {
+  id: "satellite",
+  label: "Satellite",
+  character: "NASA Blue Marble (world scale)",
+  layers: [
+    { type: "background", fill: "#04070d" },
+    { type: "sphere", fill: "#0a1a2e", stroke: "#3a4658", lineWidth: 1.2 },
+    { type: "raster", texture: "satellite" },
+    { type: "graticule", stroke: "rgba(255,255,255,0.12)", lineWidth: 0.5, step: 15 },
+    { type: "borders", stroke: "rgba(255,240,210,0.5)", lineWidth: 0.6 },
+    {
+      type: "labels",
+      labelClasses: rasterLabels("#f4efe4", "rgba(6,12,22,0.8)"),
+    },
+  ],
+};
+
+export const STYLES: StyleDef[] = [CLASSIC_ATLAS, MINIMAL, TERRAIN, SATELLITE];
 
 export const STYLES_BY_ID: Record<StyleId, StyleDef> = Object.fromEntries(
   STYLES.map((s) => [s.id, s]),

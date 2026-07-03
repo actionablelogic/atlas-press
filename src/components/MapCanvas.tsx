@@ -6,6 +6,7 @@ import type { GazetteerEntry } from "../geo/gazetteer";
 import { buildProjection, fitRegion, fitWorld, type View } from "../geo/view";
 import { getStyleDef, type StyleId } from "../styles/styles";
 import { renderMap } from "../render/renderMap";
+import { RasterWarper } from "../render/RasterWarper";
 
 interface Props {
   projectionId: ProjectionId;
@@ -37,6 +38,7 @@ export function MapCanvas({
   const detailRef = useRef<DetailLevel>("50m");
   const rafRef = useRef<number | null>(null);
   const idleTimerRef = useRef<number | null>(null);
+  const warperRef = useRef<RasterWarper | null>(null);
   const projectionIdRef = useRef(projectionId);
   projectionIdRef.current = projectionId;
   const styleIdRef = useRef(styleId);
@@ -56,6 +58,7 @@ export function MapCanvas({
     const { width, height, dpr } = sizeRef.current;
     const projectionId = projectionIdRef.current;
 
+    warperRef.current?.setSize(width, height, dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     renderMap(ctx, {
       projection: buildProjection(projectionId, view),
@@ -66,6 +69,7 @@ export function MapCanvas({
       height,
       pixelRatio: dpr,
       showLabels: labelsRef.current,
+      warper: warperRef.current ?? undefined,
     });
   };
 
@@ -117,6 +121,19 @@ export function MapCanvas({
     scheduleDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [styleId]);
+
+  // WebGL raster warper (satellite/terrain). Redraw once a texture loads.
+  useEffect(() => {
+    const warper = new RasterWarper();
+    warper.onTextureLoad = () => scheduleDraw();
+    warperRef.current = warper;
+    scheduleDraw();
+    return () => {
+      warper.dispose();
+      warperRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Track container size (CSS px) + devicePixelRatio.
   useEffect(() => {

@@ -2,7 +2,50 @@
 
 Tracking implementation progress against the milestones in `prj.md`.
 
-## Current milestone: M3 — Styles (Classic Atlas + Minimal)
+## Current milestone: M4a — Raster warping (equirectangular)
+
+> WebGL inverse-projection shader sampling a single equirectangular texture;
+> Terrain style + world-scale Satellite; interactive-quality degradation.
+> Second risky milestone. **Exit test: Blue Marble warps onto the Orthographic
+> globe, draggable, near-side-only labels.**
+
+### Task breakdown
+
+- [x] 1. Equirectangular textures prepped → `public/textures/` (Blue Marble
+      satellite + Natural Earth II shaded-relief terrain, both 5400×2700)
+- [x] 2. WebGL2 raster warper (`render/RasterWarper.ts`): **mesh reprojection** —
+      invert a coarse screen grid on CPU, GPU bilinearly interpolates the texture
+      across triangles. One code path for all 8 projections (no per-projection
+      GLSL). Antimeridian seam unwrap + off-globe cell culling.
+- [x] 3. `raster` layer type + Terrain & Satellite styles (raster underlay +
+      vector overlays: graticule, borders, rivers, labels)
+- [x] 4. renderMap integration: warp on GPU, composite clipped to sphere; flat
+      ocean fill shows while texture loads / if WebGL unavailable
+- [x] 5. Interactive degradation: coarse mesh (32) during drag, fine (110) idle
+- [x] 6. MapCanvas: warper lifecycle + redraw-on-texture-load
+
+**M4a status: COMPLETE.** `tsc -b` + `vite build` clean; verified headless with
+WebGL2 (SwiftShader): satellite→Robinson/Orthographic, terrain→world/Africa,
+and **dragging the warped Orthographic globe** all render correctly with
+near-side-only labels and zero console/page errors.
+
+### New/changed files
+- `src/render/RasterWarper.ts` — WebGL2 mesh reprojection warper
+- `src/styles/styles.ts` — `raster` layer + Terrain/Satellite styles
+- `src/render/renderMap.ts` — raster layer compositing + mesh-density knob
+- `src/components/MapCanvas.tsx` — warper instance, sizing, load redraw
+- `public/textures/satellite.jpg`, `public/textures/terrain.jpg`
+
+### Follow-ups carried forward
+- Region-scale crisp satellite = **M4b** (Mercator tile warping; licensing §8)
+- Higher-res world textures available (Blue Marble 21600×10800) if wanted
+- Textures bundled in `public/` (lazy-loaded on style select — good); consider
+  a lower-res placeholder swapped for full-res on idle
+- Projection thumbnail previews; lazy-load vector TopoJSON out of JS bundle
+
+---
+
+## M3 — Styles (Classic Atlas + Minimal)
 
 > Vector-only styles incl. political coloring, coast vignette, basic labels
 > with decluttering. Style spec is declarative (layer list + paint props).

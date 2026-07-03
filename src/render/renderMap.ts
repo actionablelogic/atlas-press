@@ -4,9 +4,14 @@ import type { WorldData } from "../geo/data";
 import type { ProjectionCapability } from "../geo/projections";
 import { lakes, rivers } from "../data/physical";
 import type { LayerSpec, StyleDef } from "../styles/styles";
+import type { RasterWarper } from "./RasterWarper";
 import { drawLabels } from "./labels";
 
 const SPHERE = { type: "Sphere" } as const;
+
+// Reprojection mesh density: coarse while interacting, fine on idle.
+const GRID_INTERACTIVE = 32;
+const GRID_IDLE = 110;
 
 export interface RenderOptions {
   projection: GeoProjection;
@@ -16,8 +21,20 @@ export interface RenderOptions {
   width: number;
   height: number;
   pixelRatio: number;
-  /** Draw labels (skipped during active interaction for performance). */
+  /** Draw labels + high-detail raster mesh (skipped during interaction). */
   showLabels?: boolean;
+  /** WebGL raster warper for satellite/terrain styles (optional). */
+  warper?: RasterWarper;
+}
+
+interface LayerContext {
+  path: ReturnType<typeof geoPath>;
+  world: WorldData;
+  projection: GeoProjection;
+  warper?: RasterWarper;
+  width: number;
+  height: number;
+  gridCols: number;
 }
 
 /**
@@ -29,9 +46,18 @@ export function renderMap(
   ctx: CanvasRenderingContext2D,
   opts: RenderOptions,
 ): void {
-  const { projection, world, style, capability, width, height } = opts;
+  const { projection, world, style, capability, width, height, warper } = opts;
   const showLabels = opts.showLabels ?? true;
   const path = geoPath(projection, ctx);
+  const layerCtx: LayerContext = {
+    path,
+    world,
+    projection,
+    warper,
+    width,
+    height,
+    gridCols: showLabels ? GRID_IDLE : GRID_INTERACTIVE,
+  };
 
   ctx.clearRect(0, 0, width, height);
 
@@ -66,7 +92,7 @@ export function renderMap(
       case "labels":
         break; // handled outside the clip
       default:
-        drawContentLayer(ctx, path, layer, world);
+        drawContentLayer(ctx, layer, layerCtx);
     }
   }
   ctx.restore();
@@ -95,11 +121,26 @@ export function renderMap(
 
 function drawContentLayer(
   ctx: CanvasRenderingContext2D,
-  path: ReturnType<typeof geoPath>,
   layer: LayerSpec,
-  world: WorldData,
+  c: LayerContext,
 ): void {
+  const { path, world } = c;
   switch (layer.type) {
+    case "raster": {
+      // Warp the equirectangular texture into the current projection on the GPU,
+      // then composite the result (already clipped to the sphere here). If GL is
+      // unsupported or the texture is still loading, the ocean fill shows.
+      if (!layer.texture || !c.warper?.supported) break;
+      const drawn = c.warper.render(
+        c.projection,
+        c.width,
+        c.height,
+        c.gridCols,
+        layer.texture,
+      );
+      if (drawn) ctx.drawImage(c.warper.canvas, 0, 0, c.width, c.height);
+      break;
+    }
     case "graticule": {
       const step = layer.step ?? 10;
       ctx.beginPath();
