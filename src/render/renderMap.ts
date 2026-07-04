@@ -5,8 +5,18 @@ import type { ProjectionCapability } from "../geo/projections";
 import { lakes, rivers } from "../data/physical";
 import { getRoadsSync } from "../data/roads";
 import type { LayerSpec, StyleDef } from "../styles/styles";
-import type { RasterWarper } from "./RasterWarper";
 import { drawLabels } from "./labels";
+
+/** Warps a raster layer for the current view and returns a canvas to composite,
+ *  or null if unavailable (GL off, texture/tiles loading). Provided by the host,
+ *  which owns the WebGL warper + Mercator mosaic and the two-tier decision. */
+export type RenderRaster = (
+  layer: LayerSpec,
+  projection: GeoProjection,
+  width: number,
+  height: number,
+  gridCols: number,
+) => HTMLCanvasElement | null;
 
 const SPHERE = { type: "Sphere" } as const;
 
@@ -24,15 +34,15 @@ export interface RenderOptions {
   pixelRatio: number;
   /** Draw labels + high-detail raster mesh (skipped during interaction). */
   showLabels?: boolean;
-  /** WebGL raster warper for satellite/terrain styles (optional). */
-  warper?: RasterWarper;
+  /** Host-provided raster warping for satellite/terrain styles (optional). */
+  renderRaster?: RenderRaster;
 }
 
 interface LayerContext {
   path: ReturnType<typeof geoPath>;
   world: WorldData;
   projection: GeoProjection;
-  warper?: RasterWarper;
+  renderRaster?: RenderRaster;
   width: number;
   height: number;
   gridCols: number;
@@ -47,14 +57,14 @@ export function renderMap(
   ctx: CanvasRenderingContext2D,
   opts: RenderOptions,
 ): void {
-  const { projection, world, style, capability, width, height, warper } = opts;
+  const { projection, world, style, capability, width, height } = opts;
   const showLabels = opts.showLabels ?? true;
   const path = geoPath(projection, ctx);
   const layerCtx: LayerContext = {
     path,
     world,
     projection,
-    warper,
+    renderRaster: opts.renderRaster,
     width,
     height,
     gridCols: showLabels ? GRID_IDLE : GRID_INTERACTIVE,
@@ -128,18 +138,11 @@ function drawContentLayer(
   const { path, world } = c;
   switch (layer.type) {
     case "raster": {
-      // Warp the equirectangular texture into the current projection on the GPU,
-      // then composite the result (already clipped to the sphere here). If GL is
-      // unsupported or the texture is still loading, the ocean fill shows.
-      if (!layer.texture || !c.warper?.supported) break;
-      const drawn = c.warper.render(
-        c.projection,
-        c.width,
-        c.height,
-        c.gridCols,
-        layer.texture,
-      );
-      if (drawn) ctx.drawImage(c.warper.canvas, 0, 0, c.width, c.height);
+      // The host warps the raster (equirect world texture or Mercator tile
+      // mosaic) and returns a canvas; we composite it clipped to the sphere.
+      // While it loads (or if GL is off), the ocean fill shows.
+      const warped = c.renderRaster?.(layer, c.projection, c.width, c.height, c.gridCols);
+      if (warped) ctx.drawImage(warped, 0, 0, c.width, c.height);
       break;
     }
     case "graticule": {

@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
-import { MapCanvas } from "./components/MapCanvas";
+import { MapCanvas, type TileConfig } from "./components/MapCanvas";
 import { ProjectionPicker } from "./components/ProjectionPicker";
 import { StylePicker } from "./components/StylePicker";
 import { CustomizePanel } from "./components/CustomizePanel";
+import { SatelliteSettings } from "./components/SatelliteSettings";
 import { SearchBox } from "./components/SearchBox";
 import { getProjectionDef, type ProjectionId } from "./geo/projections";
 import { getStyleDef, type StyleId } from "./styles/styles";
+import { TILE_SOURCES_BY_ID } from "./render/tileSources";
 import {
   applyOverrides,
   EMPTY_OVERRIDES,
@@ -23,6 +25,9 @@ export default function App() {
   const [projectionId, setProjectionId] = useState<ProjectionId>("robinson");
   const [styleId, setStyleId] = useState<StyleId>("classicAtlas");
   const [overrides, setOverrides] = useState<StyleOverrides>(EMPTY_OVERRIDES);
+  const [tileConfig, setTileConfig] = useState<TileConfig>({
+    sourceId: "eox-s2cloudless",
+  });
   const [selection, setSelection] = useState<Selection>({
     entry: null,
     nonce: 0,
@@ -64,6 +69,14 @@ export default function App() {
   const handleClear = () =>
     setSelection((s) => ({ entry: null, nonce: s.nonce + 1 }));
 
+  // Attribution shown over the map (and, later, next to Export).
+  const credit =
+    styleId === "satellite"
+      ? `${TILE_SOURCES_BY_ID[tileConfig.sourceId]?.attribution ?? ""} · NASA Blue Marble (world) · Natural Earth`
+      : styleId === "terrain"
+        ? "Natural Earth II shaded relief · Natural Earth"
+        : "Natural Earth";
+
   return (
     <div className="app">
       <header className="topbar">
@@ -88,6 +101,9 @@ export default function App() {
         <aside className="sidebar">
           <ProjectionPicker value={projectionId} onChange={setProjectionId} />
           <StylePicker value={styleId} onChange={handleSelectStyle} />
+          {styleId === "satellite" && (
+            <SatelliteSettings config={tileConfig} onChange={setTileConfig} />
+          )}
           <CustomizePanel
             preset={preset}
             overrides={overrides}
@@ -104,10 +120,12 @@ export default function App() {
           <MapCanvas
             projectionId={projectionId}
             style={style}
+            tileConfig={tileConfig}
             region={selection.entry}
             selectionNonce={selection.nonce}
             resetNonce={resetNonce}
           />
+          <span className="map-credit">{credit}</span>
         </main>
       </div>
     </div>

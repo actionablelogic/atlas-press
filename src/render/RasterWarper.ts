@@ -1,12 +1,10 @@
 import type { GeoProjection } from "d3-geo";
 
-// Mesh-based raster reprojection. Rather than invert every output pixel in a
-// per-projection GLSL shader, we invert a coarse screen grid on the CPU (a few
-// thousand `projection.invert` calls, cheap even for numeric inverses like
-// Winkel Tripel) and let the GPU bilinearly interpolate an equirectangular
-// texture across the resulting triangles. Works for all 8 projections with one
-// code path. The equirectangular source makes (lon,lat)→uv linear:
-//   u = (lon+180)/360 , v = (90-lat)/180.
+// Generic WebGL2 mesh-based raster reprojection. Invert a coarse screen grid on
+// the CPU and let the GPU bilinearly interpolate a texture across the resulting
+// triangles. The texture + the (lon,lat)→uv mapping are supplied by the caller,
+// so the same warper serves both equirectangular world imagery (M4a) and
+// dynamically-assembled Web-Mercator tile mosaics (M4b).
 
 export type TextureId = "satellite" | "terrain";
 
@@ -14,6 +12,14 @@ const TEXTURE_URLS: Record<TextureId, string> = {
   satellite: `${import.meta.env.BASE_URL}textures/satellite.jpg`,
   terrain: `${import.meta.env.BASE_URL}textures/terrain.jpg`,
 };
+
+/** (lon,lat) → texture uv, or null to drop the sample (off-texture). */
+export type UvFn = (lon: number, lat: number) => [number, number] | null;
+
+export const equirectUv: UvFn = (lon, lat) => [
+  (lon + 180) / 360,
+  (90 - lat) / 180,
+];
 
 const VERT = `#version 300 es
 in vec2 a_pos;
@@ -29,14 +35,20 @@ precision highp float;
 in vec2 v_uv;
 uniform sampler2D u_tex;
 out vec4 frag;
-void main() {
-  frag = texture(u_tex, v_uv);
-}`;
+void main() { frag = texture(u_tex, v_uv); }`;
 
-interface TexEntry {
+interface EquirectEntry {
   tex: WebGLTexture;
   loaded: boolean;
   loading: boolean;
+}
+
+export interface DrawMeshOptions {
+  /** Equirectangular textures wrap in longitude → unwrap the antimeridian seam
+   *  per cell. Mercator mosaics don't wrap; off-[0,1] cells are culled instead. */
+  wrap: boolean;
+  /** Clear the canvas before drawing (false = composite on top of a prior pass). */
+  clear: boolean;
 }
 
 export class RasterWarper {
@@ -46,9 +58,9 @@ export class RasterWarper {
   private vbo: WebGLBuffer | null = null;
   private aPos = 0;
   private aUv = 0;
-  private textures = new Map<TextureId, TexEntry>();
+  private equirect = new Map<TextureId, EquirectEntry>();
   private verts = new Float32Array(0);
-  /** Called when a texture finishes loading, so the host can redraw. */
+  /** Called when an equirect texture finishes loading, so the host can redraw. */
   onTextureLoad: (() => void) | null = null;
 
   constructor() {
@@ -69,12 +81,12 @@ export class RasterWarper {
     const vs = compile(gl, gl.VERTEX_SHADER, VERT);
     const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
     if (!vs || !fs) return;
-    const prog = gl.createProgram();
+    const prog = gl.createProgram()!;
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      console.warn("RasterWarper: program link failed", gl.getProgramInfoLog(prog));
+      console.warn("RasterWarper: link failed", gl.getProgramInfoLog(prog));
       return;
     }
     this.program = prog;
@@ -91,119 +103,134 @@ export class RasterWarper {
     if (this.canvas.height !== h) this.canvas.height = h;
   }
 
-  /** Kick off async load (idempotent). Returns true once ready to sample. */
-  ensureTexture(id: TextureId): boolean {
+  // --- texture helpers (used by the Mercator mosaic) -------------------
+  createTexture(): WebGLTexture | null {
+    return this.gl?.createTexture() ?? null;
+  }
+
+  deleteTexture(tex: WebGLTexture | null) {
+    if (tex) this.gl?.deleteTexture(tex);
+  }
+
+  uploadTexture(tex: WebGLTexture, source: TexImageSource, repeat: boolean) {
     const gl = this.gl;
-    if (!gl) return false;
-    let entry = this.textures.get(id);
-    if (entry?.loaded) return true;
-    if (entry?.loading) return false;
+    if (!gl) return;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.generateMipmap(gl.TEXTURE_2D);
+  }
+
+  /** Lazy-load a bundled equirectangular texture; null until ready. */
+  ensureEquirect(id: TextureId): WebGLTexture | null {
+    const gl = this.gl;
+    if (!gl) return null;
+    const entry = this.equirect.get(id);
+    if (entry?.loaded) return entry.tex;
+    if (entry?.loading) return null;
 
     const tex = gl.createTexture()!;
-    entry = { tex, loaded: false, loading: true };
-    this.textures.set(id, entry);
-
+    const e: EquirectEntry = { tex, loaded: false, loading: true };
+    this.equirect.set(id, e);
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      // WebGL2 allows REPEAT + mipmaps on non-power-of-two textures.
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(
-        gl.TEXTURE_2D,
-        gl.TEXTURE_MIN_FILTER,
-        gl.LINEAR_MIPMAP_LINEAR,
-      );
-      gl.generateMipmap(gl.TEXTURE_2D);
-      entry!.loaded = true;
-      entry!.loading = false;
+      this.uploadTexture(tex, img, true);
+      e.loaded = true;
+      e.loading = false;
       this.onTextureLoad?.();
     };
     img.onerror = () => {
-      entry!.loading = false;
+      e.loading = false;
       console.warn("RasterWarper: failed to load", TEXTURE_URLS[id]);
     };
     img.src = TEXTURE_URLS[id];
-    return false;
+    return null;
   }
 
   /**
-   * Warp `id` into the current projection and draw into this.canvas. Returns
-   * false if GL is unsupported or the texture isn't ready yet (caller should
-   * fall back to a flat fill until onTextureLoad fires).
+   * Warp `tex` into `projection` using `uvFn`, drawing into this.canvas.
+   * Returns false if GL is unavailable.
    */
-  render(
+  drawMesh(
     projection: GeoProjection,
     width: number,
     height: number,
     gridCols: number,
-    id: TextureId,
+    tex: WebGLTexture,
+    uvFn: UvFn,
+    opts: DrawMeshOptions,
   ): boolean {
     const gl = this.gl;
     if (!gl || !this.program) return false;
-    if (!this.ensureTexture(id)) return false;
-    const entry = this.textures.get(id)!;
 
     const cols = Math.max(4, Math.round(gridCols));
     const rows = Math.max(2, Math.round((cols * height) / width));
-    const nodeU = new Float32Array((cols + 1) * (rows + 1));
-    const nodeV = new Float32Array((cols + 1) * (rows + 1));
-    const nodeX = new Float32Array((cols + 1) * (rows + 1));
-    const nodeY = new Float32Array((cols + 1) * (rows + 1));
-    const valid = new Uint8Array((cols + 1) * (rows + 1));
+    const N = (cols + 1) * (rows + 1);
+    const nx = new Float32Array(N); // clip x
+    const ny = new Float32Array(N); // clip y
+    const nu = new Float32Array(N);
+    const nv = new Float32Array(N);
+    const ok = new Uint8Array(N);
 
-    const idx = (i: number, j: number) => j * (cols + 1) + i;
+    const at = (i: number, j: number) => j * (cols + 1) + i;
     for (let j = 0; j <= rows; j++) {
       const yCss = (j / rows) * height;
       for (let i = 0; i <= cols; i++) {
         const xCss = (i / cols) * width;
         const ll = projection.invert?.([xCss, yCss]);
-        const k = idx(i, j);
-        if (ll && Number.isFinite(ll[0]) && Number.isFinite(ll[1])) {
-          nodeX[k] = (xCss / width) * 2 - 1;
-          nodeY[k] = 1 - (yCss / height) * 2;
-          nodeU[k] = (ll[0] + 180) / 360;
-          nodeV[k] = (90 - ll[1]) / 180;
-          valid[k] = 1;
-        }
+        const k = at(i, j);
+        if (!ll || !Number.isFinite(ll[0]) || !Number.isFinite(ll[1])) continue;
+        const uv = uvFn(ll[0], ll[1]);
+        if (!uv) continue;
+        nx[k] = (xCss / width) * 2 - 1;
+        ny[k] = 1 - (yCss / height) * 2;
+        nu[k] = uv[0];
+        nv[k] = uv[1];
+        ok[k] = 1;
       }
     }
 
-    // Emit 2 triangles per fully-valid cell (6 verts × 4 floats).
     const maxVerts = cols * rows * 6 * 4;
     if (this.verts.length < maxVerts) this.verts = new Float32Array(maxVerts);
     const buf = this.verts;
     let n = 0;
     const push = (k: number, u: number) => {
-      buf[n++] = nodeX[k];
-      buf[n++] = nodeY[k];
+      buf[n++] = nx[k];
+      buf[n++] = ny[k];
       buf[n++] = u;
-      buf[n++] = nodeV[k];
+      buf[n++] = nv[k];
     };
     for (let j = 0; j < rows; j++) {
       for (let i = 0; i < cols; i++) {
-        const a = idx(i, j);
-        const b = idx(i + 1, j);
-        const c = idx(i, j + 1);
-        const d = idx(i + 1, j + 1);
-        if (!(valid[a] && valid[b] && valid[c] && valid[d])) continue;
-        // Unwrap the antimeridian seam within a cell: if the four u's straddle
-        // the 0/1 boundary, lift the small ones by 1 (REPEAT wrap samples ok).
-        let ua = nodeU[a];
-        let ub = nodeU[b];
-        let uc = nodeU[c];
-        let ud = nodeU[d];
-        const mn = Math.min(ua, ub, uc, ud);
-        const mx = Math.max(ua, ub, uc, ud);
-        if (mx - mn > 0.5) {
-          if (ua < 0.5) ua += 1;
-          if (ub < 0.5) ub += 1;
-          if (uc < 0.5) uc += 1;
-          if (ud < 0.5) ud += 1;
+        const a = at(i, j);
+        const b = at(i + 1, j);
+        const c = at(i, j + 1);
+        const d = at(i + 1, j + 1);
+        if (!(ok[a] && ok[b] && ok[c] && ok[d])) continue;
+        let ua = nu[a];
+        let ub = nu[b];
+        let uc = nu[c];
+        let ud = nu[d];
+        if (opts.wrap) {
+          const mn = Math.min(ua, ub, uc, ud);
+          const mx = Math.max(ua, ub, uc, ud);
+          if (mx - mn > 0.5) {
+            if (ua < 0.5) ua += 1;
+            if (ub < 0.5) ub += 1;
+            if (uc < 0.5) uc += 1;
+            if (ud < 0.5) ud += 1;
+          }
+        } else {
+          // Cull cells that fall outside the mosaic (BM/ocean shows instead).
+          const us = [ua, ub, uc, ud];
+          const vs = [nv[a], nv[b], nv[c], nv[d]];
+          if (Math.min(...us) < -0.002 || Math.max(...us) > 1.002) continue;
+          if (Math.min(...vs) < -0.002 || Math.max(...vs) > 1.002) continue;
         }
         push(a, ua);
         push(b, ub);
@@ -215,7 +242,7 @@ export class RasterWarper {
     }
 
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    if (opts.clear) gl.clear(gl.COLOR_BUFFER_BIT);
     if (n === 0) return true;
 
     gl.useProgram(this.program);
@@ -226,7 +253,7 @@ export class RasterWarper {
     gl.enableVertexAttribArray(this.aUv);
     gl.vertexAttribPointer(this.aUv, 2, gl.FLOAT, false, 16, 8);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, entry.tex);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.uniform1i(gl.getUniformLocation(this.program, "u_tex"), 0);
     gl.drawArrays(gl.TRIANGLES, 0, n / 4);
     return true;
@@ -235,10 +262,10 @@ export class RasterWarper {
   dispose() {
     const gl = this.gl;
     if (!gl) return;
-    for (const e of this.textures.values()) gl.deleteTexture(e.tex);
+    for (const e of this.equirect.values()) gl.deleteTexture(e.tex);
     if (this.vbo) gl.deleteBuffer(this.vbo);
     if (this.program) gl.deleteProgram(this.program);
-    this.textures.clear();
+    this.equirect.clear();
   }
 }
 

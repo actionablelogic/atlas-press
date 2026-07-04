@@ -2,7 +2,56 @@
 
 Tracking implementation progress against the milestones in `prj.md`.
 
-## Current milestone: M3b — Customize panel (+ Hobo–Dyer)
+## Current milestone: M4b — Raster warping, Mercator tiles
+
+> Region-scale crisp satellite from Web-Mercator XYZ tiles: fetch → mosaic →
+> warp in the mesh; pluggable source + key + attribution. Third risky milestone.
+> **Exit test: crisp region-scale country in Orthographic from Sentinel-2 tiles**
+> (the A0 *export* itself lands in M6).
+
+### Task breakdown
+
+- [x] 1. Mercator math (`geo/mercator.ts`): lon/lat → fractional tile, m/px
+- [x] 2. Pluggable tile sources (`render/tileSources.ts`): EOX Sentinel-2
+      cloudless (default, CC-BY-NC-SA), Esri World Imagery, Custom (URL+{key}).
+      Both defaults verified to send CORS.
+- [x] 3. Tile cache + fetch (`render/tileCache.ts`): IndexedDB store +
+      concurrency-limited (6) CORS fetch → ImageBitmap; AbortSignal for staleness
+- [x] 4. Mosaic (`render/MercatorMosaic.ts`): visible-bbox from inverse grid,
+      zoom selection from bbox+canvas (capped ≤144 tiles / 4096px), fetch +
+      assemble into a canvas → GL texture; provides the Mercator uvFn
+- [x] 5. Generalized warper: `drawMesh(projection, …, tex, uvFn, {wrap,clear})`
+      — same mesh path warps equirect (wrap+seam-unwrap) and mosaic (cull off-[0,1])
+- [x] 6. Two-tier Satellite: world → Blue Marble equirect; region → Blue Marble
+      base + Mercator tiles composited on top (fills mosaic gaps). Threshold =
+      BM would upscale. Tiles refetched only on idle (not mid-drag).
+- [x] 7. Settings UI (`SatelliteSettings`): source dropdown, custom URL + API key
+      (local only), attribution + license display; map-corner credit
+- [x] 8. renderMap decoupled via a `renderRaster` host callback
+
+**M4b status: COMPLETE.** `tsc -b` + `vite build` clean; verified headless
+(WebGL2/SwiftShader): **0 tiles at world scale (Blue Marble), 72 tiles fetched
+when zoomed to Italy, 97 after warping to Orthographic**, crisp imagery
+(colorfulness 0.95), correct credit chain, zero console/page errors. Exit test
+(crisp country in Orthographic from Sentinel-2) met on-screen; A0 export = M6.
+
+### New/changed files
+- `src/geo/mercator.ts`, `src/render/tileSources.ts`, `src/render/tileCache.ts`,
+  `src/render/MercatorMosaic.ts`, `src/components/SatelliteSettings.tsx`
+- `src/render/RasterWarper.ts` — generalized to `drawMesh` + texture upload
+- `src/render/renderMap.ts` — `renderRaster` callback
+- `src/components/MapCanvas.tsx` — mosaic + two-tier `renderRaster` + tileConfig
+- `src/App.tsx` — tileConfig state, satellite settings, credit
+
+### Follow-ups carried forward
+- Progressive mosaic upload (currently uploads once all tiles in a view arrive)
+- Tiles refetch per projection change even for the same region (acceptable)
+- IndexedDB cache has no eviction/size cap yet
+- Region satellite is non-commercial with EOX default (surface near Export in M6)
+
+---
+
+## M3b — Customize panel (+ Hobo–Dyer)
 
 > Spec expanded (prj.md): styles are **presets + a user diff**, not fixed. Layer
 > toggles, per-layer color/width, per-class typography, background & ocean colors.

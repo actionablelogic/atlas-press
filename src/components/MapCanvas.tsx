@@ -5,15 +5,25 @@ import { getWorld, type DetailLevel } from "../geo/data";
 import type { GazetteerEntry } from "../geo/gazetteer";
 import { buildProjection, fitRegion, fitWorld, type View } from "../geo/view";
 import type { StyleDef } from "../styles/styles";
-import { renderMap } from "../render/renderMap";
-import { RasterWarper } from "../render/RasterWarper";
+import { renderMap, type RenderRaster } from "../render/renderMap";
+import { RasterWarper, equirectUv } from "../render/RasterWarper";
+import { MercatorMosaic, visibleBbox } from "../render/MercatorMosaic";
+import { TILE_SOURCES_BY_ID } from "../render/tileSources";
 import { ensureRoads } from "../data/roads";
 import { BUNDLED_FAMILIES } from "../styles/fonts";
+
+export interface TileConfig {
+  sourceId: string;
+  apiKey?: string;
+  customTemplate?: string;
+}
 
 interface Props {
   projectionId: ProjectionId;
   /** Resolved style (preset + user overrides applied). */
   style: StyleDef;
+  /** Region-scale satellite tile source config. */
+  tileConfig: TileConfig;
   /** Selected region to center + fit, or null for a world fit. */
   region: GazetteerEntry | null;
   /** Bumps each time a region is (re-)selected, to force a re-fit. */
@@ -22,12 +32,17 @@ interface Props {
   resetNonce: number;
 }
 
+// Blue Marble equirect is ~5400px wide; below this many BM px across the view we
+// switch to Mercator tiles (BM would be upscaled/blurry).
+const BM_TEXTURE_WIDTH = 5400;
+
 // Geometrically-correct-ish degrees of longitude per pixel on the globe.
 const DEG_PER_PX = 180 / Math.PI;
 
 export function MapCanvas({
   projectionId,
   style,
+  tileConfig,
   region,
   selectionNonce,
   resetNonce,
@@ -42,14 +57,79 @@ export function MapCanvas({
   const rafRef = useRef<number | null>(null);
   const idleTimerRef = useRef<number | null>(null);
   const warperRef = useRef<RasterWarper | null>(null);
+  const mosaicRef = useRef<MercatorMosaic | null>(null);
   const projectionIdRef = useRef(projectionId);
   projectionIdRef.current = projectionId;
   const styleRef = useRef(style);
   styleRef.current = style;
+  const tileConfigRef = useRef(tileConfig);
+  tileConfigRef.current = tileConfig;
   const regionRef = useRef(region);
   regionRef.current = region;
   // Labels are skipped while the user is actively dragging/zooming.
   const labelsRef = useRef(true);
+
+  // Two-tier raster warping: terrain / world-satellite use the equirect Blue
+  // Marble; at region scale, satellite switches to warped Mercator tiles drawn
+  // on top of the Blue Marble base (which fills the mosaic's gaps).
+  const renderRaster: RenderRaster = (layer, projection, width, height, gridCols) => {
+    const warper = warperRef.current;
+    const mosaic = mosaicRef.current;
+    if (!warper?.supported || !layer.texture) return null;
+
+    if (layer.texture === "terrain") {
+      const tex = warper.ensureEquirect("terrain");
+      if (!tex) return null;
+      warper.drawMesh(projection, width, height, gridCols, tex, equirectUv, {
+        wrap: true,
+        clear: true,
+      });
+      return warper.canvas;
+    }
+
+    // satellite
+    const bm = warper.ensureEquirect("satellite");
+    const bbox = visibleBbox(projection, width, height);
+    const useTiles =
+      !!mosaic &&
+      !!bbox &&
+      ((bbox.maxLon - bbox.minLon) / 360) * BM_TEXTURE_WIDTH < width * 0.9;
+
+    if (!useTiles) {
+      if (!bm) return null;
+      warper.drawMesh(projection, width, height, gridCols, bm, equirectUv, {
+        wrap: true,
+        clear: true,
+      });
+      return warper.canvas;
+    }
+
+    // Region scale. Refresh tiles only when idle (not mid-drag) to avoid thrash.
+    const source = TILE_SOURCES_BY_ID[tileConfigRef.current.sourceId];
+    if (labelsRef.current && source) {
+      mosaic!.update(projection, width, height, {
+        source,
+        apiKey: tileConfigRef.current.apiKey,
+        customTemplate: tileConfigRef.current.customTemplate,
+      });
+    }
+    let drewBase = false;
+    if (bm) {
+      warper.drawMesh(projection, width, height, gridCols, bm, equirectUv, {
+        wrap: true,
+        clear: true,
+      });
+      drewBase = true;
+    }
+    const mtex = mosaic!.texture;
+    if (mtex) {
+      warper.drawMesh(projection, width, height, gridCols, mtex, mosaic!.uvFn, {
+        wrap: false,
+        clear: !drewBase,
+      });
+    }
+    return drewBase || mtex ? warper.canvas : null;
+  };
 
   // --- drawing ---------------------------------------------------------
   const draw = () => {
@@ -76,7 +156,7 @@ export function MapCanvas({
       height,
       pixelRatio: dpr,
       showLabels: labelsRef.current,
-      warper: warperRef.current ?? undefined,
+      renderRaster,
     });
   };
 
@@ -122,12 +202,12 @@ export function MapCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectionId, region, selectionNonce, resetNonce]);
 
-  // Style change (preset or override) only needs a redraw (view unchanged).
+  // Style or tile-source change only needs a redraw (view unchanged).
   useEffect(() => {
     labelsRef.current = true;
     scheduleDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [style]);
+  }, [style, tileConfig]);
 
   // Force-load bundled fonts, then redraw so canvas text uses them (canvas
   // won't lazy-trigger a webfont fetch on its own).
@@ -139,15 +219,21 @@ export function MapCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // WebGL raster warper (satellite/terrain). Redraw once a texture loads.
+  // WebGL raster warper + Mercator mosaic. Redraw when a texture or tile mosaic
+  // becomes ready.
   useEffect(() => {
     const warper = new RasterWarper();
     warper.onTextureLoad = () => scheduleDraw();
+    const mosaic = new MercatorMosaic(warper);
+    mosaic.onReady = () => scheduleDraw();
     warperRef.current = warper;
+    mosaicRef.current = mosaic;
     scheduleDraw();
     return () => {
+      mosaic.dispose();
       warper.dispose();
       warperRef.current = null;
+      mosaicRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

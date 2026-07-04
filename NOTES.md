@@ -3,6 +3,50 @@
 Running log of tuning decisions (stroke widths, palettes, projection quirks)
 that will be revisited repeatedly, per the suggestion in `prj.md` §7.
 
+## M4b — Raster warping, Mercator tiles
+
+### Same mesh, different uv
+- The M4a mesh warper generalizes: `RasterWarper.drawMesh(projection, w, h, grid,
+  tex, uvFn, {wrap, clear})`. Equirect passes `equirectUv` + `wrap:true` (seam
+  unwrap, REPEAT). Mercator passes the mosaic's `uvFn` + `wrap:false` (cells with
+  any corner outside [0,1] are culled → no edge smear). No per-projection GLSL.
+- Two passes into one warper canvas: Blue Marble base (`clear:true`) then the tile
+  mosaic on top (`clear:false`) so the crisp region sits on the blurry BM and
+  mosaic gaps are filled.
+
+### Mosaic (`render/MercatorMosaic.ts`)
+- `visibleBbox` inverts a 10×10 screen grid; bails (→ Blue Marble) if the view
+  wraps the antimeridian or spans >170° lon.
+- Zoom = `round(log2(width*QUALITY / (dxFrac*256)))` (QUALITY 1.4), clamped to the
+  source's range, then reduced until tiles ≤144 and mosaic ≤4096px.
+- Tiles fetched via the cache, drawn into an assembly canvas, uploaded as one GL
+  texture once the view's tiles all resolve. A single texture is reused across
+  views; the previous mosaic keeps showing until the new one is ready.
+- `uvFn(lon,lat)` = fractional Mercator tile normalized to the mosaic's tile range.
+- Staleness: each `update` aborts the prior `AbortController`; late tiles are dropped.
+
+### Two-tier trigger
+- Use tiles when `(lonSpan/360)*5400 < canvasWidth*0.9` — i.e. Blue Marble (5400px
+  wide) would be upscaled. World/continent → BM (no tile fetches); country → tiles.
+- Tiles are refreshed **only on idle** (the labels flag): mid-drag we keep warping
+  the existing mosaic (crisp where covered, BM elsewhere), so dragging never
+  thrashes the tile fetcher. Verified: 0 fetches at world, 72 for Italy.
+
+### Tiles & CORS (`tileCache.ts`, `tileSources.ts`)
+- Fetched with `fetch(url,{mode:"cors"})` → Blob → IndexedDB → `createImageBitmap`.
+  CORS is mandatory (WebGL texture upload) — EOX s2cloudless reflects Origin, Esri
+  sends `*`. Both verified before building.
+- Concurrency capped at 6; IndexedDB store `atlas-tiles/tiles` keyed by
+  `sourceId/z/x/y`. No eviction yet.
+- EOX WMTS uses `.../g/{z}/{y}/{x}.jpg` (TileMatrix/Row/Col = z/y/x). Default source
+  is **CC-BY-NC-SA (non-commercial)** — the license/attribution is shown in the
+  settings panel and as a map-corner credit (prj.md §8).
+
+### renderMap decoupling
+- `renderMap` no longer knows about WebGL. Raster layers call a host-provided
+  `renderRaster(layer, projection, w, h, grid) → canvas | null`, composited clipped
+  to the sphere. MapCanvas owns the warper + mosaic + the two-tier decision.
+
 ## M3b — Customize panel (+ Hobo–Dyer)
 
 ### Preset + diff model (`styles/overrides.ts`)
