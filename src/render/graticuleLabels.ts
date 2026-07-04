@@ -19,7 +19,9 @@ export interface GraticuleLabelOptions {
   step: number;
   color: string;
   halo: string;
-  font: string;
+  fontSize: number;
+  fontFamily: string;
+  scale: number;
 }
 
 /**
@@ -40,10 +42,10 @@ export function drawGraticuleLabels(
   const step = Math.max(5, opts.step);
 
   ctx.save();
-  ctx.font = opts.font;
+  ctx.font = `500 ${opts.fontSize}px ${opts.fontFamily}`;
   ctx.fillStyle = opts.color;
   ctx.strokeStyle = opts.halo;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 3 * opts.scale;
   ctx.lineJoin = "round";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -72,7 +74,7 @@ export function drawGraticuleLabels(
       const p = visible(lon, lat);
       if (p && (!best || p[1] < best[1])) best = p;
     }
-    if (best) label(fmtLon(lon), best[0], Math.max(9, best[1] - 8));
+    if (best) label(fmtLon(lon), best[0], Math.max(9 * opts.scale, best[1] - 8 * opts.scale));
   }
 
   // Parallels → leftmost visible point.
@@ -84,7 +86,7 @@ export function drawGraticuleLabels(
     }
     if (best) {
       ctx.textAlign = "left";
-      label(fmtLat(lat), Math.min(width - 24, best[0] + 6), best[1]);
+      label(fmtLat(lat), Math.min(width - 24 * opts.scale, best[0] + 6 * opts.scale), best[1]);
       ctx.textAlign = "center";
     }
   }

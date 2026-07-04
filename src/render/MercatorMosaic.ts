@@ -63,7 +63,7 @@ interface Plan {
 export class MercatorMosaic {
   private warper: RasterWarper;
   private tex: WebGLTexture | null = null;
-  private assemble: HTMLCanvasElement;
+  private assembleCanvas: HTMLCanvasElement;
   private plan: Plan | null = null;
   private key = "";
   private abort: AbortController | null = null;
@@ -71,7 +71,7 @@ export class MercatorMosaic {
 
   constructor(warper: RasterWarper) {
     this.warper = warper;
-    this.assemble = document.createElement("canvas");
+    this.assembleCanvas = document.createElement("canvas");
   }
 
   /** The mosaic texture, or null if none has been assembled yet. */
@@ -125,7 +125,7 @@ export class MercatorMosaic {
     const signal = this.abort.signal;
 
     const { z, tx0, ty0, nx, ny } = plan;
-    const cv = this.assemble;
+    const cv = this.assembleCanvas;
     cv.width = nx * 256;
     cv.height = ny * 256;
     const ctx = cv.getContext("2d");
@@ -159,6 +159,22 @@ export class MercatorMosaic {
       }
     }
     return true;
+  }
+
+  /** Assemble the mosaic and resolve once its texture is ready (for export). */
+  assemble(
+    projection: GeoProjection,
+    width: number,
+    height: number,
+    req: MosaicRequest,
+  ): Promise<boolean> {
+    const suitable = this.update(projection, width, height, req);
+    if (!suitable) return Promise.resolve(false);
+    if (this.texture) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      this.onReady = () => resolve(this.texture != null);
+      setTimeout(() => resolve(this.texture != null), 30000);
+    });
   }
 
   uvFn: UvFn = (lon, lat) => {

@@ -2,7 +2,55 @@
 
 Tracking implementation progress against the milestones in `prj.md`.
 
-## Current milestone: M5 — Overlays
+## Current milestone: M6 — Export
+
+> Tiled high-DPI rendering with streaming PNG/JPEG encode in a worker; SVG export
+> for vector styles; size/DPI dialog with A0+ presets. Overlays finally
+> rasterized into exports. **Exit test (from M4b): crisp A0 country in
+> Orthographic from Sentinel-2 tiles.**
+
+### Task breakdown
+
+- [x] 1. Print-size math (`export/sizes.ts`): presets (24×36, 50×70cm, A1, A0,
+      2×A0, custom) × DPI (150/200/300, A0+ default 200); live px + est-size
+- [x] 2. `renderScale` threaded through renderMap / labels / graticuleLabels so
+      strokes + fonts scale for high-DPI (export = same view at higher resolution)
+- [x] 3. Strip rendering (`export/renderExport.ts`): export projection + per-strip
+      offset; bounded memory (one 1024px strip at a time)
+- [x] 4. Streaming PNG encoder in a Worker (`pngStream.worker.ts`, pako): filter-0
+      scanlines → incremental deflate → one IDAT per block; handles A0+ (140 MP)
+- [x] 5. Raster export: fresh export warper + mosaic (`assemble`/`loadEquirect`
+      awaited) → **satellite re-fetches tiles at export zoom** (spec §5.4)
+- [x] 6. Overlays rasterized into raster export (`render/drawOverlays.ts`:
+      compass/cartouche/text/frame) + graticule labels + attribution footer
+- [x] 7. SVG export for vector styles (`export/svgExport.ts`): geoPath→`d`,
+      labels + overlays as SVG, clipped to sphere; disabled for raster styles
+- [x] 8. JPEG (single-canvas `toBlob`, size-capped ≤100 MP) for satellite
+- [x] 9. Export dialog (`ExportDialog.tsx`) + progress bar; `MapCanvas` exposes
+      the current view via `forwardRef`/`useImperativeHandle`
+
+**M6 status: COMPLETE.** `tsc -b` + `vite build` clean (worker bundles). Verified
+headless (downloads inspected): **vector PNG A1@150 = 4967×3855 (19 MP), valid
+PNG, crisp with cartouche/frame/graticule-labels/footer baked in**; **satellite
+PNG (Switzerland, Orthographic) = 4967×3855, valid, crisp Sentinel-2**; SVG =
+valid vector (248 paths + 101 texts). Zero console/page errors.
+
+### New/changed files
+- `src/export/` — sizes.ts, renderExport.ts, svgExport.ts, pngStream.ts,
+  pngStream.worker.ts
+- `src/render/drawOverlays.ts`; `render/renderMap.ts` + `labels.ts` +
+  `graticuleLabels.ts` (renderScale); `RasterWarper.ts` (loadEquirect),
+  `MercatorMosaic.ts` (assemble)
+- `src/components/ExportDialog.tsx`, `MapCanvas.tsx` (forwardRef handle), `App.tsx`
+
+### Follow-ups carried forward
+- JPEG only for sizes that fit one canvas (large → PNG); JPEG streaming later
+- SVG labels are country+ocean only (no capitals/cities), simple declutter
+- IndexedDB tile cache has no eviction; export refetches export-zoom tiles
+
+---
+
+## M5 — Overlays
 
 > Graticule edge degree-labels; compass, frame, cartouche, text with transform
 > handles (drag/resize/rotate), stored poster-relative so they survive

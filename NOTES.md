@@ -3,6 +3,44 @@
 Running log of tuning decisions (stroke widths, palettes, projection quirks)
 that will be revisited repeatedly, per the suggestion in `prj.md` §7.
 
+## M6 — Export
+
+### export = same view at higher resolution
+- The export builds an **export projection** = the preview view with `scale`,
+  `translate` × k (k = exportWidth / previewWidth), and threads `renderScale = k`
+  through `renderMap` → all stroke widths, font sizes, halos, dot radii, vignette
+  blur multiply by k. So a 3× export looks identical to the preview, just crisp.
+  Export aspect = preview aspect (true poster-aspect presets are M7).
+
+### Strip rendering + streaming PNG (bounded memory)
+- Render in horizontal strips of 1024 export px. Each strip: a canvas
+  `exportW × stripH`, an export projection with `translate.y − y0`, `renderMap`
+  (map + graticule labels) then `drawOverlays` under `translate(0,−y0)`.
+- PNG: each strip's `getImageData` rows are filter-0-prefixed and posted
+  (transferred) to a Worker that feeds them to `pako.Deflate` incrementally,
+  emitting **one IDAT chunk per deflate block** + CRC32. Peak memory ≈ one strip
+  + deflate buffers → A0@300 (140 MP) is safe. Signature/IHDR/IEND hand-written.
+- JPEG: strips blit into one full canvas → `toBlob('image/jpeg')`, size-capped
+  (streaming JPEG is a follow-up). Satellite is the JPEG use case (PNG of imagery
+  is huge — verified 47 MB for an A1 satellite vs 3 MB vector).
+
+### Raster export re-fetches at export zoom
+- Export creates its **own** `RasterWarper` + `MercatorMosaic` (GL textures can't
+  cross contexts). `loadEquirect`/`assemble` are awaited before the strip loop.
+  The mosaic's zoom is derived from the *export* width → satellite tiles are
+  fetched at higher zoom than the preview (spec §5.4: "export re-fetches full
+  zoom"). Warp grid density ~ one node / 40 export px.
+
+### Overlays in export
+- Decor stickers are DOM in the editor; `drawOverlays` re-draws them on canvas at
+  export scale (compass via paths, cartouche/text via fillText, frame via
+  strokeRect). SVG export emits them as `<g>`/`<text>`/`<rect>`.
+
+### Wiring
+- `MapCanvas` exposes the live view via `forwardRef` + `useImperativeHandle`
+  (`getExportState`), so the dialog reads the exact on-screen composition.
+- `pako` ESM has no default export → `import { Deflate } from "pako"`.
+
 ## M5 — Overlays
 
 ### Two families

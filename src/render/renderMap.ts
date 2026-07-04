@@ -37,6 +37,8 @@ export interface RenderOptions {
   showLabels?: boolean;
   /** Draw graticule degree labels along the frame edge. */
   showGraticuleLabels?: boolean;
+  /** Multiplier for stroke widths / font sizes (>1 for high-DPI export). */
+  renderScale?: number;
   /** Host-provided raster warping for satellite/terrain styles (optional). */
   renderRaster?: RenderRaster;
 }
@@ -65,6 +67,8 @@ interface LayerContext {
   width: number;
   height: number;
   gridCols: number;
+  /** Multiplier for stroke widths / font sizes (>1 for high-DPI export). */
+  scale: number;
 }
 
 /**
@@ -78,6 +82,7 @@ export function renderMap(
 ): void {
   const { projection, world, style, capability, width, height } = opts;
   const showLabels = opts.showLabels ?? true;
+  const s = opts.renderScale ?? 1;
   const path = geoPath(projection, ctx);
   const layerCtx: LayerContext = {
     path,
@@ -87,6 +92,7 @@ export function renderMap(
     width,
     height,
     gridCols: showLabels ? GRID_IDLE : GRID_INTERACTIVE,
+    scale: s,
   };
 
   ctx.clearRect(0, 0, width, height);
@@ -131,21 +137,14 @@ export function renderMap(
   if (sphere?.stroke) {
     ctx.beginPath();
     path(SPHERE);
-    ctx.lineWidth = sphere.lineWidth ?? 1;
+    ctx.lineWidth = (sphere.lineWidth ?? 1) * s;
     ctx.strokeStyle = sphere.stroke;
     ctx.stroke();
   }
 
   // 5. Labels.
   if (showLabels && labels?.labelClasses) {
-    drawLabels(
-      ctx,
-      projection,
-      labels.labelClasses,
-      width,
-      height,
-      capability,
-    );
+    drawLabels(ctx, projection, labels.labelClasses, width, height, capability, s);
   }
 
   // 6. Graticule degree labels (geographic overlay, prj.md §5.6).
@@ -157,7 +156,9 @@ export function renderMap(
       step: grat?.step ?? 15,
       color: dark ? "#ece4d4" : "#4a3f2c",
       halo: dark ? "rgba(6,12,22,0.75)" : bg?.fill ?? "rgba(255,255,255,0.85)",
-      font: "500 11px 'EB Garamond', Georgia, serif",
+      fontSize: 11 * s,
+      fontFamily: "'EB Garamond', Georgia, serif",
+      scale: s,
     });
   }
 }
@@ -167,7 +168,7 @@ function drawContentLayer(
   layer: LayerSpec,
   c: LayerContext,
 ): void {
-  const { path, world } = c;
+  const { path, world, scale: s } = c;
   switch (layer.type) {
     case "raster": {
       // The host warps the raster (equirect world texture or Mercator tile
@@ -181,7 +182,7 @@ function drawContentLayer(
       const step = layer.step ?? 10;
       ctx.beginPath();
       path(geoGraticule().step([step, step])());
-      ctx.lineWidth = layer.lineWidth ?? 0.5;
+      ctx.lineWidth = (layer.lineWidth ?? 0.5) * s;
       ctx.strokeStyle = layer.stroke ?? "#999";
       ctx.stroke();
       break;
@@ -191,7 +192,7 @@ function drawContentLayer(
       // from the land silhouette, then the real fills cover the land.
       ctx.save();
       ctx.shadowColor = layer.color ?? "rgba(0,0,0,0.4)";
-      ctx.shadowBlur = layer.blur ?? 10;
+      ctx.shadowBlur = (layer.blur ?? 10) * s;
       ctx.beginPath();
       path(world.land);
       ctx.fillStyle = layer.color ?? "rgba(0,0,0,0.4)";
@@ -210,7 +211,7 @@ function drawContentLayer(
         ctx.fillStyle = flat ?? palette[idx % palette.length];
         ctx.fill();
         if (layer.stroke) {
-          ctx.lineWidth = layer.lineWidth ?? 0.4;
+          ctx.lineWidth = (layer.lineWidth ?? 0.4) * s;
           ctx.strokeStyle = layer.stroke;
           ctx.stroke();
         }
@@ -222,7 +223,7 @@ function drawContentLayer(
       if (!roads) break; // lazy-loaded on demand; MapCanvas triggers the fetch
       ctx.beginPath();
       path(roads);
-      ctx.lineWidth = layer.lineWidth ?? 0.4;
+      ctx.lineWidth = (layer.lineWidth ?? 0.4) * s;
       ctx.strokeStyle = layer.stroke ?? "#a2624a";
       ctx.stroke();
       break;
@@ -235,7 +236,7 @@ function drawContentLayer(
         ctx.fill();
       }
       if (layer.stroke) {
-        ctx.lineWidth = layer.lineWidth ?? 0.7;
+        ctx.lineWidth = (layer.lineWidth ?? 0.7) * s;
         ctx.strokeStyle = layer.stroke;
         ctx.stroke();
       }
@@ -244,9 +245,9 @@ function drawContentLayer(
     case "borders": {
       ctx.beginPath();
       path(world.borders);
-      ctx.lineWidth = layer.lineWidth ?? 0.6;
+      ctx.lineWidth = (layer.lineWidth ?? 0.6) * s;
       ctx.strokeStyle = layer.stroke ?? "#888";
-      if (layer.lineDash) ctx.setLineDash(layer.lineDash);
+      if (layer.lineDash) ctx.setLineDash(layer.lineDash.map((d) => d * s));
       ctx.stroke();
       if (layer.lineDash) ctx.setLineDash([]);
       break;
@@ -254,7 +255,7 @@ function drawContentLayer(
     case "rivers": {
       ctx.beginPath();
       path(rivers);
-      ctx.lineWidth = layer.lineWidth ?? 0.6;
+      ctx.lineWidth = (layer.lineWidth ?? 0.6) * s;
       ctx.strokeStyle = layer.stroke ?? "#8fb0c4";
       ctx.stroke();
       break;
@@ -267,7 +268,7 @@ function drawContentLayer(
         ctx.fill();
       }
       if (layer.stroke) {
-        ctx.lineWidth = layer.lineWidth ?? 0.4;
+        ctx.lineWidth = (layer.lineWidth ?? 0.4) * s;
         ctx.strokeStyle = layer.stroke;
         ctx.stroke();
       }

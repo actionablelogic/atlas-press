@@ -152,6 +152,24 @@ export class RasterWarper {
     return null;
   }
 
+  /** Await an equirect texture (for export, which can't skip a frame). */
+  loadEquirect(id: TextureId): Promise<WebGLTexture | null> {
+    const tex = this.ensureEquirect(id);
+    if (tex) return Promise.resolve(tex);
+    return new Promise((resolve) => {
+      const prev = this.onTextureLoad;
+      this.onTextureLoad = () => {
+        prev?.();
+        const t = this.ensureEquirect(id);
+        if (t) {
+          this.onTextureLoad = prev;
+          resolve(t);
+        }
+      };
+      setTimeout(() => resolve(this.ensureEquirect(id)), 20000);
+    });
+  }
+
   /**
    * Warp `tex` into `projection` using `uvFn`, drawing into this.canvas.
    * Returns false if GL is unavailable.

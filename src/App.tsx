@@ -1,5 +1,10 @@
-import { useMemo, useState } from "react";
-import { MapCanvas, type TileConfig } from "./components/MapCanvas";
+import { useMemo, useRef, useState } from "react";
+import {
+  MapCanvas,
+  type MapCanvasHandle,
+  type TileConfig,
+} from "./components/MapCanvas";
+import { ExportDialog } from "./components/ExportDialog";
 import { ProjectionPicker } from "./components/ProjectionPicker";
 import { StylePicker } from "./components/StylePicker";
 import { CustomizePanel } from "./components/CustomizePanel";
@@ -44,6 +49,8 @@ export default function App() {
     nonce: 0,
   });
   const [resetNonce, setResetNonce] = useState(0);
+  const [exportOpen, setExportOpen] = useState(false);
+  const mapRef = useRef<MapCanvasHandle>(null);
 
   const preset = getStyleDef(styleId);
   const style = useMemo(
@@ -117,6 +124,13 @@ export default function App() {
           >
             Reset view
           </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setExportOpen(true)}
+          >
+            Export ⭳
+          </button>
         </div>
       </header>
 
@@ -151,6 +165,7 @@ export default function App() {
 
         <main className="stage">
           <MapCanvas
+            ref={mapRef}
             projectionId={projectionId}
             style={style}
             tileConfig={tileConfig}
@@ -170,6 +185,19 @@ export default function App() {
           <span className="map-credit">{credit}</span>
         </main>
       </div>
+
+      {exportOpen && (
+        <ExportDialog
+          projectionId={projectionId}
+          style={style}
+          tileConfig={tileConfig}
+          showGraticuleLabels={geoOverlays.graticuleLabels}
+          overlays={overlays}
+          credit={credit}
+          getExportState={() => mapRef.current?.getExportState() ?? null}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
     </div>
   );
 }

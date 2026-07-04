@@ -21,10 +21,10 @@ interface Candidate {
 
 const DEG = Math.PI / 180;
 
-function fontFor(cls: LabelClass): string {
+function fontFor(cls: LabelClass, scale = 1): string {
   const style = cls.italic ? "italic " : "";
   const weight = cls.weight ?? 400;
-  return `${style}${weight} ${cls.sizePx}px ${cls.font}`;
+  return `${style}${weight} ${cls.sizePx * scale}px ${cls.font}`;
 }
 
 function overlaps(a: Box, boxes: Box[]): boolean {
@@ -54,6 +54,7 @@ export function drawLabels(
   width: number,
   height: number,
   capability: ProjectionCapability,
+  sizeScale = 1,
 ): void {
   const scale = projection.scale();
   const rot = projection.rotate();
@@ -110,15 +111,15 @@ export function drawLabels(
     }
 
     const cls = c.cls;
-    ctx.font = fontFor(cls);
-    ctx.letterSpacing = `${cls.letterSpacing ?? 0}px`;
+    ctx.font = fontFor(cls, sizeScale);
+    ctx.letterSpacing = `${(cls.letterSpacing ?? 0) * sizeScale}px`;
     ctx.fontVariantCaps = cls.smallCaps ? "small-caps" : "normal";
     const text = cls.uppercase ? c.text.toUpperCase() : c.text;
     const tw = ctx.measureText(text).width;
-    const th = cls.sizePx;
+    const th = cls.sizePx * sizeScale;
     const isPoint = cls.kind === "capital" || cls.kind === "city";
 
-    const drawX = isPoint ? x + 5 : x;
+    const drawX = isPoint ? x + 5 * sizeScale : x;
     const boxX = isPoint ? drawX : drawX - tw / 2;
     const box: Box = { x: boxX - 2, y: y - th / 2 - 2, w: tw + 4, h: th + 4 };
     if (overlaps(box, placed)) continue;
@@ -127,12 +128,12 @@ export function drawLabels(
     ctx.textAlign = isPoint ? "left" : "center";
     if (isPoint) {
       ctx.beginPath();
-      ctx.arc(x, y, 1.6, 0, Math.PI * 2);
+      ctx.arc(x, y, 1.6 * sizeScale, 0, Math.PI * 2);
       ctx.fillStyle = cls.color;
       ctx.fill();
     }
     if (cls.halo) {
-      ctx.lineWidth = cls.haloWidth ?? 3;
+      ctx.lineWidth = (cls.haloWidth ?? 3) * sizeScale;
       ctx.strokeStyle = cls.halo;
       ctx.strokeText(text, drawX, y);
     }

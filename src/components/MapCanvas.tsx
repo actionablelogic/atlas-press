@@ -1,4 +1,10 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  type ReactNode,
+} from "react";
 import versor from "versor";
 import { getProjectionDef, type ProjectionId } from "../geo/projections";
 import { getWorld, type DetailLevel } from "../geo/data";
@@ -16,6 +22,16 @@ export interface TileConfig {
   sourceId: string;
   apiKey?: string;
   customTemplate?: string;
+}
+
+export interface ExportState {
+  view: View;
+  width: number;
+  height: number;
+}
+
+export interface MapCanvasHandle {
+  getExportState: () => ExportState | null;
 }
 
 interface Props {
@@ -45,17 +61,20 @@ const BM_TEXTURE_WIDTH = 5400;
 // Geometrically-correct-ish degrees of longitude per pixel on the globe.
 const DEG_PER_PX = 180 / Math.PI;
 
-export function MapCanvas({
-  projectionId,
-  style,
-  tileConfig,
-  showGraticuleLabels,
-  region,
-  selectionNonce,
-  resetNonce,
-  onBackgroundPointerDown,
-  children,
-}: Props) {
+export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
+  {
+    projectionId,
+    style,
+    tileConfig,
+    showGraticuleLabels,
+    region,
+    selectionNonce,
+    resetNonce,
+    onBackgroundPointerDown,
+    children,
+  },
+  ref,
+) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -81,6 +100,14 @@ export function MapCanvas({
   regionRef.current = region;
   // Labels are skipped while the user is actively dragging/zooming.
   const labelsRef = useRef(true);
+
+  useImperativeHandle(ref, () => ({
+    getExportState: () => {
+      const view = viewRef.current;
+      const { width, height } = sizeRef.current;
+      return view && width && height ? { view, width, height } : null;
+    },
+  }));
 
   // Two-tier raster warping: terrain / world-satellite use the equirect Blue
   // Marble; at region scale, satellite switches to warped Mercator tiles drawn
@@ -416,4 +443,4 @@ export function MapCanvas({
       {children}
     </div>
   );
-}
+});
