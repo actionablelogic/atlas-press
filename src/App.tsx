@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MapCanvas } from "./components/MapCanvas";
 import { ProjectionPicker } from "./components/ProjectionPicker";
 import { StylePicker } from "./components/StylePicker";
+import { CustomizePanel } from "./components/CustomizePanel";
 import { SearchBox } from "./components/SearchBox";
 import { getProjectionDef, type ProjectionId } from "./geo/projections";
-import type { StyleId } from "./styles/styles";
+import { getStyleDef, type StyleId } from "./styles/styles";
+import {
+  applyOverrides,
+  EMPTY_OVERRIDES,
+  type StyleOverrides,
+} from "./styles/overrides";
 import type { GazetteerEntry } from "./geo/gazetteer";
 import "./App.css";
 
@@ -16,11 +22,33 @@ interface Selection {
 export default function App() {
   const [projectionId, setProjectionId] = useState<ProjectionId>("robinson");
   const [styleId, setStyleId] = useState<StyleId>("classicAtlas");
+  const [overrides, setOverrides] = useState<StyleOverrides>(EMPTY_OVERRIDES);
   const [selection, setSelection] = useState<Selection>({
     entry: null,
     nonce: 0,
   });
   const [resetNonce, setResetNonce] = useState(0);
+
+  const preset = getStyleDef(styleId);
+  const style = useMemo(
+    () => applyOverrides(preset, overrides),
+    [preset, overrides],
+  );
+
+  const hasOverrides = overrides !== EMPTY_OVERRIDES;
+
+  const handleSelectStyle = (id: StyleId) => {
+    if (id === styleId) return;
+    // Picking a new preset resets customizations (confirm if any exist).
+    if (
+      hasOverrides &&
+      !window.confirm("Switching style will reset your customizations. Continue?")
+    ) {
+      return;
+    }
+    setOverrides(EMPTY_OVERRIDES);
+    setStyleId(id);
+  };
 
   const handleSelect = (entry: GazetteerEntry) => {
     // Polar regions render poorly on world pseudo-cylindricals → auto-suggest
@@ -59,7 +87,13 @@ export default function App() {
       <div className="body">
         <aside className="sidebar">
           <ProjectionPicker value={projectionId} onChange={setProjectionId} />
-          <StylePicker value={styleId} onChange={setStyleId} />
+          <StylePicker value={styleId} onChange={handleSelectStyle} />
+          <CustomizePanel
+            preset={preset}
+            overrides={overrides}
+            onChange={setOverrides}
+            onReset={() => setOverrides(EMPTY_OVERRIDES)}
+          />
           <p className="hint">
             Drag to rotate · scroll to zoom · double-click to re-center
             (globe views)
@@ -69,7 +103,7 @@ export default function App() {
         <main className="stage">
           <MapCanvas
             projectionId={projectionId}
-            styleId={styleId}
+            style={style}
             region={selection.entry}
             selectionNonce={selection.nonce}
             resetNonce={resetNonce}

@@ -2,7 +2,58 @@
 
 Tracking implementation progress against the milestones in `prj.md`.
 
-## Current milestone: M4a — Raster warping (equirectangular)
+## Current milestone: M3b — Customize panel (+ Hobo–Dyer)
+
+> Spec expanded (prj.md): styles are **presets + a user diff**, not fixed. Layer
+> toggles, per-layer color/width, per-class typography, background & ocean colors.
+> Plus a 9th projection (Hobo–Dyer). **Exit test: recreate a passable Minimal
+> look starting from the Classic Atlas preset using only panel controls.**
+
+### Task breakdown
+
+- [x] 1. Hobo–Dyer projection (9th card) — `geoCylindricalEqualArea().parallel(37.5)`,
+      rotates-λ capability. (Gall–Peters/Behrmann/south-up variants = noted follow-up.)
+- [x] 2. `StyleOverrides` model + `applyOverrides(preset, diff) → StyleDef`
+      (`styles/overrides.ts`); renderer only sees the resolved style
+- [x] 3. Layer toggles: borders, fills, coastline, rivers, lakes, roads, graticule,
+      + label classes (country/capital/city/ocean). Toggling ON a layer absent from
+      the preset adds it from a catalog default; toggling OFF removes it
+- [x] 4. Per-layer color + stroke width; flat land-fill override; background & ocean
+- [x] 5. Per-class typography: font family, size scale, color, halo, small-caps;
+      "font for all classes" link control
+- [x] 6. Roads layer: NE **10m** major highways, filtered to 9,752 + quantized
+      (2.3 MB), served from /public, **lazy-loaded on first toggle**
+- [x] 7. ~8 bundled OFL fonts (EB Garamond, Playfair, Inter, Archivo, Roboto Slab,
+      JetBrains Mono) via /public/fonts/fonts.css; force-loaded then redraw
+- [x] 8. Customize panel UI (collapsible, two-tier disclosure); reset-on-preset-
+      change with confirm
+
+**M3b status: COMPLETE.** `tsc -b` + `vite build` clean; verified headless (zero
+console/page errors): Hobo–Dyer renders; the exit test (Classic Atlas → Minimal-ish
+via toggles) works; roads lazy-load + render (confirmed via magenta pixel probe);
+fonts load. Small-caps/halo/size/color controls resolve through `applyOverrides`.
+
+### New/changed files
+- `src/styles/overrides.ts` — StyleOverrides + applyOverrides + resolve helpers
+- `src/styles/fonts.ts` — curated font list + bundled families
+- `src/components/CustomizePanel.tsx` — the panel
+- `src/data/roads.ts` + `public/data/roads.json` — lazy roads
+- `public/fonts/*` — bundled OFL woff2 + fonts.css
+- `src/geo/projections.ts` (+shim) — Hobo–Dyer
+- `src/styles/styles.ts` — `roads` layer, LabelClass smallCaps/haloWidth
+- `src/render/renderMap.ts` — roads + flat-fill; `src/render/labels.ts` — small-caps
+- `src/components/MapCanvas.tsx`, `src/App.tsx` — resolved-style prop, overrides state
+
+### Follow-ups carried forward
+- coastVignette isn't a toggle → turning fills off exposes its interior fill as
+  muddy grey land (still "passable"); consider glow-only vignette or a toggle
+- Hobo–Dyer variants (Gall–Peters 45°, Behrmann 30°, south-up γ=180°)
+- Color inputs are hex-only (drop rgba alpha on edit)
+- Fonts/roads add to bundle/assets; still no lazy-loading of core TopoJSON
+
+---
+
+## M4a — Raster warping (equirectangular)
 
 > WebGL inverse-projection shader sampling a single equirectangular texture;
 > Terrain style + world-scale Satellite; interactive-quality degradation.

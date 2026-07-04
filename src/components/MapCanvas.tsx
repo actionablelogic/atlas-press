@@ -4,13 +4,16 @@ import { getProjectionDef, type ProjectionId } from "../geo/projections";
 import { getWorld, type DetailLevel } from "../geo/data";
 import type { GazetteerEntry } from "../geo/gazetteer";
 import { buildProjection, fitRegion, fitWorld, type View } from "../geo/view";
-import { getStyleDef, type StyleId } from "../styles/styles";
+import type { StyleDef } from "../styles/styles";
 import { renderMap } from "../render/renderMap";
 import { RasterWarper } from "../render/RasterWarper";
+import { ensureRoads } from "../data/roads";
+import { BUNDLED_FAMILIES } from "../styles/fonts";
 
 interface Props {
   projectionId: ProjectionId;
-  styleId: StyleId;
+  /** Resolved style (preset + user overrides applied). */
+  style: StyleDef;
   /** Selected region to center + fit, or null for a world fit. */
   region: GazetteerEntry | null;
   /** Bumps each time a region is (re-)selected, to force a re-fit. */
@@ -24,7 +27,7 @@ const DEG_PER_PX = 180 / Math.PI;
 
 export function MapCanvas({
   projectionId,
-  styleId,
+  style,
   region,
   selectionNonce,
   resetNonce,
@@ -41,8 +44,8 @@ export function MapCanvas({
   const warperRef = useRef<RasterWarper | null>(null);
   const projectionIdRef = useRef(projectionId);
   projectionIdRef.current = projectionId;
-  const styleIdRef = useRef(styleId);
-  styleIdRef.current = styleId;
+  const styleRef = useRef(style);
+  styleRef.current = style;
   const regionRef = useRef(region);
   regionRef.current = region;
   // Labels are skipped while the user is actively dragging/zooming.
@@ -57,13 +60,17 @@ export function MapCanvas({
     if (!ctx) return;
     const { width, height, dpr } = sizeRef.current;
     const projectionId = projectionIdRef.current;
+    const style = styleRef.current;
+
+    // Roads are lazy-loaded the first time a style includes the (visible) layer.
+    if (style.layers.some((l) => l.type === "roads")) ensureRoads(scheduleDraw);
 
     warperRef.current?.setSize(width, height, dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     renderMap(ctx, {
       projection: buildProjection(projectionId, view),
       world: getWorld(detailRef.current),
-      style: getStyleDef(styleIdRef.current),
+      style,
       capability: getProjectionDef(projectionId).capability,
       width,
       height,
@@ -115,12 +122,22 @@ export function MapCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectionId, region, selectionNonce, resetNonce]);
 
-  // Style change only needs a redraw (view unchanged).
+  // Style change (preset or override) only needs a redraw (view unchanged).
   useEffect(() => {
     labelsRef.current = true;
     scheduleDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [styleId]);
+  }, [style]);
+
+  // Force-load bundled fonts, then redraw so canvas text uses them (canvas
+  // won't lazy-trigger a webfont fetch on its own).
+  useEffect(() => {
+    if (!document.fonts) return;
+    Promise.all(
+      BUNDLED_FAMILIES.map((f) => document.fonts.load(`16px '${f}'`)),
+    ).then(() => scheduleDraw());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // WebGL raster warper (satellite/terrain). Redraw once a texture loads.
   useEffect(() => {

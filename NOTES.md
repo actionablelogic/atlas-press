@@ -3,6 +3,50 @@
 Running log of tuning decisions (stroke widths, palettes, projection quirks)
 that will be revisited repeatedly, per the suggestion in `prj.md` §7.
 
+## M3b — Customize panel (+ Hobo–Dyer)
+
+### Preset + diff model (`styles/overrides.ts`)
+- A style = **preset (`StyleDef`) + `StyleOverrides` diff**. `applyOverrides()`
+  resolves them into a single `StyleDef`; the renderer never sees overrides.
+  `MapDocument.styleOverrides` (per the updated prj.md) will serialize the diff.
+- Layers are rebuilt in a fixed canonical render order (`CONTENT_ORDER`) so a
+  toggleable layer can be **added** (from `LAYER_CATALOG` defaults) or **removed**,
+  not just tweaked. Preset-only layers (background/sphere/raster/coastVignette)
+  pass through; background→`fill`, sphere→ocean `fill` are override targets.
+- Label classes are rebuilt from the four toggleable kinds so capitals/cities/etc.
+  can be toggled on even if the preset didn't include them (synthesized from a
+  template class + `LABEL_DEFAULTS`).
+- `flat land fill`: a color override on the `fills` layer sets `countries.fill`,
+  which the renderer uses instead of the political palette.
+- UI reads current values via `resolvePaint` / `resolveType` / `effectiveToggle`
+  (override → preset → catalog fallback), so controls show real defaults.
+
+### Hobo–Dyer
+- `geoCylindricalEqualArea().parallel(37.5)` (d3-geo-projection). Same one-parameter
+  family as Gall–Peters (45°) / Behrmann (30°); south-up = γ 180°. Capability:
+  rotates λ only. Added as the 9th projection card.
+
+### Roads (lazy, heavy)
+- NE 10m is the only scale with roads and the raw file is **67 MB**. Prepped once:
+  filter to `type === "Major Highway"` (9,752 features), round coords to 3 dp →
+  **2.3 MB** at `public/data/roads.json`. Served from /public and fetched **only on
+  first toggle** (`data/roads.ts`, sync accessor + `ensureRoads(onReady)`), then a
+  redraw. Default 0.55 px `#9c5636` (0.4 px was near-invisible AA over tan land —
+  verified rendering with a magenta pixel probe during dev).
+
+### Fonts
+- 6 OFL families bundled as latin-subset woff2 in `public/fonts/` (+ `fonts.css`
+  linked from index.html) — not CDN, so worker-side export/offline will work.
+  Canvas won't lazily fetch a webfont, so MapCanvas force-loads them
+  (`document.fonts.load`) then redraws. Small-caps via `ctx.fontVariantCaps`.
+
+### Notes
+- Background is drawn full-canvas before the sphere, so "background color outside
+  the sphere/outline" (prj.md M4a note) is already plumbed and now user-overridable.
+- coastVignette fills the land silhouette (relying on fills/land to cover it); with
+  fills toggled off it shows as muddy grey land. It isn't a spec toggle — acceptable
+  "passable" per the exit test; a glow-only vignette is a follow-up.
+
 ## M4a — Raster warping (equirectangular)
 
 ### Why mesh reprojection, not a per-pixel inverse shader

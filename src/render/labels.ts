@@ -112,6 +112,7 @@ export function drawLabels(
     const cls = c.cls;
     ctx.font = fontFor(cls);
     ctx.letterSpacing = `${cls.letterSpacing ?? 0}px`;
+    ctx.fontVariantCaps = cls.smallCaps ? "small-caps" : "normal";
     const text = cls.uppercase ? c.text.toUpperCase() : c.text;
     const tw = ctx.measureText(text).width;
     const th = cls.sizePx;
@@ -131,7 +132,7 @@ export function drawLabels(
       ctx.fill();
     }
     if (cls.halo) {
-      ctx.lineWidth = 3;
+      ctx.lineWidth = cls.haloWidth ?? 3;
       ctx.strokeStyle = cls.halo;
       ctx.strokeText(text, drawX, y);
     }
@@ -140,5 +141,6 @@ export function drawLabels(
   }
 
   ctx.letterSpacing = "0px";
+  ctx.fontVariantCaps = "normal";
   ctx.textAlign = "left";
 }

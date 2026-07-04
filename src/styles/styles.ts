@@ -16,7 +16,9 @@ export interface LabelClass {
   italic?: boolean;
   color: string;
   halo?: string; // outline color for legibility over busy fills
+  haloWidth?: number; // px, default 3
   uppercase?: boolean;
+  smallCaps?: boolean;
   letterSpacing?: number; // px
   /** Only show this class once projection.scale() ≥ minScale. */
   minScale?: number;
@@ -35,6 +37,7 @@ export type LayerType =
   | "borders"
   | "rivers"
   | "lakes"
+  | "roads"
   | "labels";
 
 export interface LayerSpec {

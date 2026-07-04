@@ -3,6 +3,7 @@ import type { Feature } from "geojson";
 import type { WorldData } from "../geo/data";
 import type { ProjectionCapability } from "../geo/projections";
 import { lakes, rivers } from "../data/physical";
+import { getRoadsSync } from "../data/roads";
 import type { LayerSpec, StyleDef } from "../styles/styles";
 import type { RasterWarper } from "./RasterWarper";
 import { drawLabels } from "./labels";
@@ -164,12 +165,14 @@ function drawContentLayer(
       break;
     }
     case "countries": {
+      // A `fill` override flattens the political palette to one land color.
       const palette = layer.palette ?? ["#ccc"];
+      const flat = layer.fill;
       for (const f of world.countries.features) {
         const idx = world.countryColor.get(String((f as Feature).id ?? "")) ?? 0;
         ctx.beginPath();
         path(f);
-        ctx.fillStyle = palette[idx % palette.length];
+        ctx.fillStyle = flat ?? palette[idx % palette.length];
         ctx.fill();
         if (layer.stroke) {
           ctx.lineWidth = layer.lineWidth ?? 0.4;
@@ -177,6 +180,16 @@ function drawContentLayer(
           ctx.stroke();
         }
       }
+      break;
+    }
+    case "roads": {
+      const roads = getRoadsSync();
+      if (!roads) break; // lazy-loaded on demand; MapCanvas triggers the fetch
+      ctx.beginPath();
+      path(roads);
+      ctx.lineWidth = layer.lineWidth ?? 0.4;
+      ctx.strokeStyle = layer.stroke ?? "#a2624a";
+      ctx.stroke();
       break;
     }
     case "land": {
