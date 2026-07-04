@@ -30,6 +30,11 @@ export function SearchBox({ selected, onSelect, onClear }: Props) {
 
   useEffect(() => setActive(0), [query]);
 
+  // Reflect a programmatic selection (e.g. restored from a shared link).
+  useEffect(() => {
+    setQuery(selected ? selected.name : "");
+  }, [selected]);
+
   // Close on outside click.
   useEffect(() => {
     if (!open) return;

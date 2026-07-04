@@ -32,6 +32,8 @@ export interface ExportState {
 
 export interface MapCanvasHandle {
   getExportState: () => ExportState | null;
+  /** Restore an exact camera (for URL/file document loading). */
+  setView: (view: View) => void;
 }
 
 interface Props {
@@ -42,6 +44,8 @@ interface Props {
   tileConfig: TileConfig;
   /** Draw graticule degree labels along the frame edge. */
   showGraticuleLabels: boolean;
+  /** Poster aspect ratio (width / height). */
+  aspect: number;
   /** Selected region to center + fit, or null for a world fit. */
   region: GazetteerEntry | null;
   /** Bumps each time a region is (re-)selected, to force a re-fit. */
@@ -67,6 +71,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
     style,
     tileConfig,
     showGraticuleLabels,
+    aspect,
     region,
     selectionNonce,
     resetNonce,
@@ -94,6 +99,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
   tileConfigRef.current = tileConfig;
   const gratLabelsRef = useRef(showGraticuleLabels);
   gratLabelsRef.current = showGraticuleLabels;
+  const aspectRef = useRef(aspect);
+  aspectRef.current = aspect;
   const bgPointerRef = useRef(onBackgroundPointerDown);
   bgPointerRef.current = onBackgroundPointerDown;
   const regionRef = useRef(region);
@@ -106,6 +113,12 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
       const view = viewRef.current;
       const { width, height } = sizeRef.current;
       return view && width && height ? { view, width, height } : null;
+    },
+    setView: (view: View) => {
+      viewRef.current = view;
+      detailRef.current = "50m";
+      labelsRef.current = true;
+      scheduleDraw();
     },
   }));
 
@@ -279,25 +292,37 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track container size (CSS px) + devicePixelRatio.
+  // Size the poster to a fixed-aspect box that contain-fits the stage, then size
+  // the canvas to it. Re-runs when the stage resizes or the aspect changes.
   useEffect(() => {
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
-    if (!wrap || !canvas) return;
+    const stage = wrap?.parentElement;
+    if (!wrap || !canvas || !stage) return;
+    const PAD = 28;
 
     const apply = () => {
-      const rect = wrap.getBoundingClientRect();
+      const availW = Math.max(1, stage.clientWidth - 2 * PAD);
+      const availH = Math.max(1, stage.clientHeight - 2 * PAD);
+      const ar = aspectRef.current;
+      let width = availW;
+      let height = width / ar;
+      if (height > availH) {
+        height = availH;
+        width = height * ar;
+      }
+      width = Math.floor(width);
+      height = Math.floor(height);
+      wrap.style.width = `${width}px`;
+      wrap.style.height = `${height}px`;
+
       const dpr = window.devicePixelRatio || 1;
-      const width = Math.max(1, Math.floor(rect.width));
-      const height = Math.max(1, Math.floor(rect.height));
       const prev = sizeRef.current;
       sizeRef.current = { width, height, dpr };
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
-      // First sizing → fit. Subsequent resizes keep the view but re-fit so the
-      // sphere stays centered (M1: simplest correct behavior).
       if (!viewRef.current || prev.width !== width || prev.height !== height) {
         refit();
       } else {
@@ -307,10 +332,10 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
 
     apply();
     const ro = new ResizeObserver(apply);
-    ro.observe(wrap);
+    ro.observe(stage);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [aspect]);
 
   // --- pointer interaction ---------------------------------------------
   useEffect(() => {
@@ -421,12 +446,63 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
       drawInteractive();
     };
 
+    const onKeyDown = (e: KeyboardEvent) => {
+      const view = viewRef.current;
+      if (!view) return;
+      const cap = getProjectionDef(projectionIdRef.current).capability;
+      const { width, height } = sizeRef.current;
+      const step = 6;
+      const zoom = (f: number) => {
+        const cx = width / 2;
+        const cy = height / 2;
+        view.translate = [
+          cx - (cx - view.translate[0]) * f,
+          cy - (cy - view.translate[1]) * f,
+        ];
+        view.scale = Math.max(1, view.scale * f);
+      };
+      let handled = true;
+      switch (e.key) {
+        case "ArrowLeft":
+          view.rotation = [view.rotation[0] - step, view.rotation[1], view.rotation[2]];
+          break;
+        case "ArrowRight":
+          view.rotation = [view.rotation[0] + step, view.rotation[1], view.rotation[2]];
+          break;
+        case "ArrowUp":
+          if (cap.rotates === "lambdaPhiGamma")
+            view.rotation = [view.rotation[0], Math.min(90, view.rotation[1] + step), view.rotation[2]];
+          else view.translate = [view.translate[0], view.translate[1] + 24];
+          break;
+        case "ArrowDown":
+          if (cap.rotates === "lambdaPhiGamma")
+            view.rotation = [view.rotation[0], Math.max(-90, view.rotation[1] - step), view.rotation[2]];
+          else view.translate = [view.translate[0], view.translate[1] - 24];
+          break;
+        case "+":
+        case "=":
+          zoom(1.15);
+          break;
+        case "-":
+        case "_":
+          zoom(1 / 1.15);
+          break;
+        default:
+          handled = false;
+      }
+      if (handled) {
+        e.preventDefault();
+        drawInteractive();
+      }
+    };
+
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerUp);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("dblclick", onDblClick);
+    canvas.addEventListener("keydown", onKeyDown);
     return () => {
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
@@ -434,12 +510,19 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("dblclick", onDblClick);
+      canvas.removeEventListener("keydown", onKeyDown);
     };
   }, []);
 
   return (
     <div ref={wrapRef} className="map-canvas-wrap">
-      <canvas ref={canvasRef} className="map-canvas" />
+      <canvas
+        ref={canvasRef}
+        className="map-canvas"
+        tabIndex={0}
+        role="application"
+        aria-label="Map preview — arrow keys to pan, plus/minus to zoom"
+      />
       {children}
     </div>
   );

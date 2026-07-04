@@ -2,7 +2,56 @@
 
 Tracking implementation progress against the milestones in `prj.md`.
 
-## Current milestone: M6 — Export
+**All milestones complete: M1, M2, M3, M3b, M4a, M4b, M5, M6, M7.** Atlas Press
+is a working v1 — 9 projections, region search, 4 style presets + a full
+customize panel, equirectangular + Mercator-tile raster warping, decor overlays
+with transform handles, high-DPI streaming export (PNG/JPEG/SVG), poster aspect
+presets, and URL/file sharing. See per-milestone sections below and `NOTES.md`.
+
+## Current milestone: M7 — Polish
+
+> Poster aspect presets, URL sharing, keyboard a11y, mobile-usable preview,
+> attribution footer.
+
+### Task breakdown
+
+- [x] 1. Poster aspect presets (`poster/aspects.ts` + `CanvasPanel`): 2:3, 3:4,
+      1:1, ISO A (1:√2) × portrait/landscape. Poster is now a letterboxed
+      fixed-aspect box (MapCanvas contain-fits it to the stage) — **also resolves
+      the M6 export-aspect note** (export dims follow the poster aspect)
+- [x] 2. URL sharing + save/load (`doc/serialize.ts`): full `PosterDoc`
+      (projection, style, overrides, tile source, overlays, graticule labels,
+      aspect/orientation, region id, camera view) → URL hash + JSON file. API key
+      is intentionally not serialized. Restores on load incl. exact camera via
+      `MapCanvas.setView`
+- [x] 3. SearchBox syncs its label to a restored/programmatic selection
+- [x] 4. Keyboard a11y: canvas is focusable with arrow-key pan + ± zoom;
+      focus-visible outlines on all controls
+- [x] 5. Mobile: responsive layout stacks (wrapped topbar, full-width search,
+      scrollable panels, letterboxed poster) — usable on a 390px viewport
+- [x] 6. Attribution: persistent map-corner credit + toggleable export footer
+
+**M7 status: COMPLETE.** `tsc -b` + `vite build` clean; verified headless (zero
+errors): aspect ratios exact (2:3→0.666, landscape→1.5, 1:1→1.0); Share→reload
+round-trip restores projection + style + aspect + region + camera (Japan in
+Winkel/Minimal/ISO-A); search label restores; mobile layout stacks.
+
+### New/changed files
+- `src/poster/aspects.ts`, `src/doc/serialize.ts`
+- `src/components/CanvasPanel.tsx`, `SearchBox.tsx` (label sync)
+- `src/components/MapCanvas.tsx` (aspect box sizing, setView handle, keyboard)
+- `src/App.tsx` (aspect/orientation state, share/save/load, load-on-mount, toast)
+- `src/App.css` (aspect/toast/focus/responsive)
+
+### Follow-ups (post-v1)
+- Full read-only mobile mode (currently responsive-editable)
+- Custom aspect entry; per-print-size true aspect lock in the export dialog
+- JPEG streaming for very large sizes; SVG capital/city labels; tile-cache eviction
+- Compass auto-north; tropics/Tissot/scale-bar overlays; projection thumbnails
+
+---
+
+## M6 — Export
 
 > Tiled high-DPI rendering with streaming PNG/JPEG encode in a worker; SVG export
 > for vector styles; size/DPI dialog with A0+ presets. Overlays finally

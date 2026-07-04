@@ -3,6 +3,31 @@
 Running log of tuning decisions (stroke widths, palettes, projection quirks)
 that will be revisited repeatedly, per the suggestion in `prj.md` §7.
 
+## M7 — Polish
+
+### Poster aspect box
+- The poster is a fixed-aspect rectangle, not the whole stage. `MapCanvas` sizes
+  its `.map-canvas-wrap` to contain-fit `aspect` (w/h) within the stage (minus a
+  28px inset), and the canvas follows. The size effect observes the **stage**
+  (parent) and re-runs on `[aspect]`. Because the export reads the preview dims,
+  **export aspect now == poster aspect** (fixes the M6 note). Aspect presets are
+  stored portrait `[a,b]` and swapped by orientation.
+
+### Sharing (`doc/serialize.ts`, §5.8)
+- `PosterDoc` (projection/style/overrides/tileSource/overlays/graticule/aspect/
+  orientation/regionId/view) → `#d=<uri-encoded JSON>` for links, or a `.json`
+  file. **API key is never serialized.** On load, all state is set and the exact
+  camera is restored via `MapCanvas.setView` after a short delay (so the canvas
+  has sized + the region fit has run first, then setView overrides it).
+- SearchBox mirrors the `selected` prop into its input so a restored region shows
+  its name.
+
+### a11y & mobile
+- Canvas is `tabIndex=0`, `role=application`; arrow keys pan (λ, and φ or vertical
+  pan by capability), ± zooms about center. `:focus-visible` outlines everywhere.
+- One `@media (max-width:820px)` block stacks the layout (wrapped topbar,
+  full-width search, scrollable sidebar, letterboxed poster below).
+
 ## M6 — Export
 
 ### export = same view at higher resolution

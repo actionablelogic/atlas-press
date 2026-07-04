@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MapCanvas,
   type MapCanvasHandle,
@@ -8,6 +8,7 @@ import { ExportDialog } from "./components/ExportDialog";
 import { ProjectionPicker } from "./components/ProjectionPicker";
 import { StylePicker } from "./components/StylePicker";
 import { CustomizePanel } from "./components/CustomizePanel";
+import { CanvasPanel } from "./components/CanvasPanel";
 import { SatelliteSettings } from "./components/SatelliteSettings";
 import { OverlayLayer } from "./components/OverlayLayer";
 import {
@@ -24,7 +25,13 @@ import {
   EMPTY_OVERRIDES,
   type StyleOverrides,
 } from "./styles/overrides";
-import type { GazetteerEntry } from "./geo/gazetteer";
+import { getGazetteer, type GazetteerEntry } from "./geo/gazetteer";
+import {
+  ASPECTS_BY_ID,
+  aspectRatio,
+  type Orientation,
+} from "./poster/aspects";
+import { readHash, writeHash, type PosterDoc } from "./doc/serialize";
 import "./App.css";
 
 interface Selection {
@@ -44,25 +51,103 @@ export default function App() {
   const [geoOverlays, setGeoOverlays] = useState<GeoOverlayConfig>({
     graticuleLabels: false,
   });
-  const [selection, setSelection] = useState<Selection>({
-    entry: null,
-    nonce: 0,
-  });
+  const [aspectId, setAspectId] = useState("2:3");
+  const [orientation, setOrientation] = useState<Orientation>("portrait");
+  const [selection, setSelection] = useState<Selection>({ entry: null, nonce: 0 });
   const [resetNonce, setResetNonce] = useState(0);
   const [exportOpen, setExportOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const mapRef = useRef<MapCanvasHandle>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const preset = getStyleDef(styleId);
-  const style = useMemo(
-    () => applyOverrides(preset, overrides),
-    [preset, overrides],
+  const style = useMemo(() => applyOverrides(preset, overrides), [preset, overrides]);
+  const aspect = aspectRatio(
+    (ASPECTS_BY_ID[aspectId] ?? ASPECTS_BY_ID["2:3"]).base,
+    orientation,
   );
-
   const hasOverrides = overrides !== EMPTY_OVERRIDES;
+
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
+
+  const applyDoc = (doc: PosterDoc) => {
+    setProjectionId(doc.projectionId);
+    setStyleId(doc.styleId);
+    setOverrides(doc.overrides ?? EMPTY_OVERRIDES);
+    setTileConfig({ sourceId: doc.tileSourceId ?? "eox-s2cloudless" });
+    setOverlays(doc.overlays ?? []);
+    setGeoOverlays({ graticuleLabels: !!doc.graticuleLabels });
+    setAspectId(doc.aspectId ?? "2:3");
+    setOrientation(doc.orientation ?? "portrait");
+    const entry = doc.regionId
+      ? getGazetteer().find((e) => e.id === doc.regionId) ?? null
+      : null;
+    setSelection((s) => ({ entry, nonce: s.nonce + 1 }));
+    if (doc.view) {
+      const view = doc.view;
+      setTimeout(() => mapRef.current?.setView(view), 150);
+    }
+  };
+
+  // Load a shared document from the URL hash on first mount.
+  useEffect(() => {
+    const doc = readHash();
+    if (doc) applyDoc(doc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const currentDoc = (): PosterDoc => ({
+    v: 1,
+    projectionId,
+    styleId,
+    overrides,
+    tileSourceId: tileConfig.sourceId,
+    overlays,
+    graticuleLabels: geoOverlays.graticuleLabels,
+    aspectId,
+    orientation,
+    regionId: selection.entry?.id ?? null,
+    view: mapRef.current?.getExportState()?.view ?? null,
+  });
+
+  const share = async () => {
+    const url = writeHash(currentDoc());
+    try {
+      await navigator.clipboard.writeText(url);
+      flash("Share link copied to clipboard");
+    } catch {
+      flash("Link is in the address bar");
+    }
+  };
+
+  const saveFile = () => {
+    const blob = new Blob([JSON.stringify(currentDoc(), null, 2)], {
+      type: "application/json",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "atlas-poster.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+
+  const loadFile = (file: File) => {
+    file.text().then((t) => {
+      try {
+        const doc = JSON.parse(t) as PosterDoc;
+        if (doc.v === 1) applyDoc(doc);
+        else flash("Unrecognized file");
+      } catch {
+        flash("Could not read file");
+      }
+    });
+  };
 
   const handleSelectStyle = (id: StyleId) => {
     if (id === styleId) return;
-    // Picking a new preset resets customizations (confirm if any exist).
     if (
       hasOverrides &&
       !window.confirm("Switching style will reset your customizations. Continue?")
@@ -74,8 +159,6 @@ export default function App() {
   };
 
   const handleSelect = (entry: GazetteerEntry) => {
-    // Polar regions render poorly on world pseudo-cylindricals → auto-suggest
-    // the entry's azimuthal projection, unless we're already on an azimuthal.
     const currentIsAzimuthal =
       getProjectionDef(projectionId).capability.rotates === "lambdaPhiGamma";
     if (entry.suggestProjection && !currentIsAzimuthal) {
@@ -99,7 +182,6 @@ export default function App() {
     setSelectedOverlay((s) => (s === id ? null : s));
   };
 
-  // Attribution shown over the map (and, later, next to Export).
   const credit =
     styleId === "satellite"
       ? `${TILE_SOURCES_BY_ID[tileConfig.sourceId]?.attribution ?? ""} · NASA Blue Marble (world) · Natural Earth`
@@ -117,13 +199,25 @@ export default function App() {
           onClear={handleClear}
         />
         <div className="topbar-actions">
-          <button
-            type="button"
-            className="btn"
-            onClick={() => setResetNonce((n) => n + 1)}
-          >
+          <button type="button" className="btn" onClick={() => setResetNonce((n) => n + 1)}>
             Reset view
           </button>
+          <button type="button" className="btn" onClick={share} title="Copy a shareable link">
+            Share
+          </button>
+          <button type="button" className="btn" onClick={saveFile} title="Save .json">
+            Save
+          </button>
+          <button type="button" className="btn" onClick={() => fileInput.current?.click()} title="Load .json">
+            Load
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json"
+            hidden
+            onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])}
+          />
           <button
             type="button"
             className="btn btn-primary"
@@ -141,6 +235,12 @@ export default function App() {
           {styleId === "satellite" && (
             <SatelliteSettings config={tileConfig} onChange={setTileConfig} />
           )}
+          <CanvasPanel
+            aspectId={aspectId}
+            orientation={orientation}
+            onAspect={setAspectId}
+            onOrientation={setOrientation}
+          />
           <CustomizePanel
             preset={preset}
             overrides={overrides}
@@ -158,8 +258,7 @@ export default function App() {
             onGeoChange={setGeoOverlays}
           />
           <p className="hint">
-            Drag to rotate · scroll to zoom · double-click to re-center
-            (globe views)
+            Drag to rotate · scroll to zoom · double-click to re-center (globe views)
           </p>
         </aside>
 
@@ -170,6 +269,7 @@ export default function App() {
             style={style}
             tileConfig={tileConfig}
             showGraticuleLabels={geoOverlays.graticuleLabels}
+            aspect={aspect}
             region={selection.entry}
             selectionNonce={selection.nonce}
             resetNonce={resetNonce}
@@ -185,6 +285,8 @@ export default function App() {
           <span className="map-credit">{credit}</span>
         </main>
       </div>
+
+      {toast && <div className="toast">{toast}</div>}
 
       {exportOpen && (
         <ExportDialog
