@@ -26,6 +26,11 @@ declare module "d3-geo-projection" {
   export function geoRobinson(): GeoProjection;
   export function geoWinkel3(): GeoProjection;
   export function geoMollweide(): GeoProjection;
+  interface GeoCylindricalEqualAreaProjection extends GeoProjection {
+    parallel(): number;
+    parallel(p: number): this;
+  }
+  export function geoCylindricalEqualArea(): GeoCylindricalEqualAreaProjection;
 }
 
 // world-atlas TopoJSON assets, imported as JSON. Kept loose (the concrete

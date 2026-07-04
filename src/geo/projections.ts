@@ -6,13 +6,19 @@ import {
   geoStereographic,
   type GeoProjection,
 } from "d3-geo";
-import { geoRobinson, geoWinkel3, geoMollweide } from "d3-geo-projection";
+import {
+  geoRobinson,
+  geoWinkel3,
+  geoMollweide,
+  geoCylindricalEqualArea,
+} from "d3-geo-projection";
 
 export type ProjectionId =
   | "equalEarth"
   | "robinson"
   | "winkel3"
   | "mollweide"
+  | "hoboDyer"
   | "orthographic"
   | "azimuthalEquidistant"
   | "albers"
@@ -90,6 +96,16 @@ export const PROJECTIONS: ProjectionDef[] = [
     label: "Mollweide",
     character: "Elliptical, equal-area, scientific",
     factory: () => geoMollweide(),
+    capability: worldCyl,
+  },
+  {
+    id: "hoboDyer",
+    label: "Hobo–Dyer",
+    character: "Rectangular equal-area, the anti-Mercator",
+    // Lambert cylindrical equal-area with standard parallels at 37.5°.
+    // Siblings (Gall–Peters 45°, Behrmann 30°, south-up γ=180°) are the same
+    // one-parameter family — cheap variants for later.
+    factory: () => geoCylindricalEqualArea().parallel(37.5),
     capability: worldCyl,
   },
   {
