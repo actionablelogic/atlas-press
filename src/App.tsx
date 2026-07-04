@@ -4,7 +4,13 @@ import { ProjectionPicker } from "./components/ProjectionPicker";
 import { StylePicker } from "./components/StylePicker";
 import { CustomizePanel } from "./components/CustomizePanel";
 import { SatelliteSettings } from "./components/SatelliteSettings";
+import { OverlayLayer } from "./components/OverlayLayer";
+import {
+  OverlaysPanel,
+  type GeoOverlayConfig,
+} from "./components/OverlaysPanel";
 import { SearchBox } from "./components/SearchBox";
+import { createOverlay, type Overlay, type OverlayType } from "./overlays/types";
 import { getProjectionDef, type ProjectionId } from "./geo/projections";
 import { getStyleDef, type StyleId } from "./styles/styles";
 import { TILE_SOURCES_BY_ID } from "./render/tileSources";
@@ -27,6 +33,11 @@ export default function App() {
   const [overrides, setOverrides] = useState<StyleOverrides>(EMPTY_OVERRIDES);
   const [tileConfig, setTileConfig] = useState<TileConfig>({
     sourceId: "eox-s2cloudless",
+  });
+  const [overlays, setOverlays] = useState<Overlay[]>([]);
+  const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
+  const [geoOverlays, setGeoOverlays] = useState<GeoOverlayConfig>({
+    graticuleLabels: false,
   });
   const [selection, setSelection] = useState<Selection>({
     entry: null,
@@ -69,6 +80,18 @@ export default function App() {
   const handleClear = () =>
     setSelection((s) => ({ entry: null, nonce: s.nonce + 1 }));
 
+  const addOverlay = (type: OverlayType) => {
+    const o = createOverlay(type);
+    setOverlays((list) => [...list, o]);
+    setSelectedOverlay(o.id);
+  };
+  const changeOverlay = (o: Overlay) =>
+    setOverlays((list) => list.map((x) => (x.id === o.id ? o : x)));
+  const deleteOverlay = (id: string) => {
+    setOverlays((list) => list.filter((x) => x.id !== id));
+    setSelectedOverlay((s) => (s === id ? null : s));
+  };
+
   // Attribution shown over the map (and, later, next to Export).
   const credit =
     styleId === "satellite"
@@ -110,6 +133,16 @@ export default function App() {
             onChange={setOverrides}
             onReset={() => setOverrides(EMPTY_OVERRIDES)}
           />
+          <OverlaysPanel
+            overlays={overlays}
+            selectedId={selectedOverlay}
+            onSelect={setSelectedOverlay}
+            onAdd={addOverlay}
+            onChange={changeOverlay}
+            onDelete={deleteOverlay}
+            geo={geoOverlays}
+            onGeoChange={setGeoOverlays}
+          />
           <p className="hint">
             Drag to rotate · scroll to zoom · double-click to re-center
             (globe views)
@@ -121,10 +154,19 @@ export default function App() {
             projectionId={projectionId}
             style={style}
             tileConfig={tileConfig}
+            showGraticuleLabels={geoOverlays.graticuleLabels}
             region={selection.entry}
             selectionNonce={selection.nonce}
             resetNonce={resetNonce}
-          />
+            onBackgroundPointerDown={() => setSelectedOverlay(null)}
+          >
+            <OverlayLayer
+              overlays={overlays}
+              selectedId={selectedOverlay}
+              onSelect={setSelectedOverlay}
+              onChange={changeOverlay}
+            />
+          </MapCanvas>
           <span className="map-credit">{credit}</span>
         </main>
       </div>

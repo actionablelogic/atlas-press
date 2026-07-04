@@ -2,7 +2,50 @@
 
 Tracking implementation progress against the milestones in `prj.md`.
 
-## Current milestone: M4b — Raster warping, Mercator tiles
+## Current milestone: M5 — Overlays
+
+> Graticule edge degree-labels; compass, frame, cartouche, text with transform
+> handles (drag/resize/rotate), stored poster-relative so they survive
+> reprojection and export.
+
+### Task breakdown
+
+- [x] 1. Graticule edge degree-labels (`render/graticuleLabels.ts`) — meridians
+      at topmost visible point, parallels at leftmost; reprojects with the map;
+      light/dark auto per background; drawn on canvas
+- [x] 2. Overlay model (`overlays/types.ts`) — poster-relative (0..1) transforms;
+      compass / cartouche / text / frame
+- [x] 3. Decor overlay layer (`OverlayLayer.tsx`) — DOM/SVG over the canvas;
+      move + corner-resize + rotate (Shift = 15° snap) + center snapping; the
+      layer is pointer-events-none so the map stays draggable underneath
+- [x] 4. Compass rose (star / simple SVG), decorative frame (thin/double/woven),
+      title cartouche (title+subtitle, boxed), user text (font/color)
+- [x] 5. Overlays panel (`OverlaysPanel.tsx`) — add / list / select / delete /
+      edit props + graticule-labels toggle
+- [x] 6. Poster-locked behavior: overlays stay put while the map reprojects
+
+**M5 status: COMPLETE.** `tsc -b` + `vite build` clean; verified headless (zero
+console/page errors): graticule labels render; all 4 overlay types add; compass
+drag + resize confirmed; overlays stay in poster space when switching to
+Orthographic. Reproduces the reference wall-map look (cartouche + compass +
+frame + labelled graticule).
+
+### New/changed files
+- `src/overlays/types.ts`, `src/render/graticuleLabels.ts`
+- `src/components/OverlayLayer.tsx`, `src/components/OverlaysPanel.tsx`
+- `src/render/renderMap.ts` (graticule labels), `src/components/MapCanvas.tsx`
+  (children slot + graticule flag + background-click deselect), `src/App.tsx`
+
+### Follow-ups carried forward
+- Compass "auto-rotate to true north" (needs the projection's north bearing at
+  the compass position — deferred)
+- Tropics / equator / polar-circle dashed lines; Tissot indicatrices; scale bar
+- Overlays are DOM in preview; M6 export must rasterize them onto the canvas
+- Inline text editing (currently edited via the panel)
+
+---
+
+## M4b — Raster warping, Mercator tiles
 
 > Region-scale crisp satellite from Web-Mercator XYZ tiles: fetch → mosaic →
 > warp in the mesh; pluggable source + key + attribution. Third risky milestone.

@@ -3,6 +3,33 @@
 Running log of tuning decisions (stroke widths, palettes, projection quirks)
 that will be revisited repeatedly, per the suggestion in `prj.md` §7.
 
+## M5 — Overlays
+
+### Two families
+- **Geographic** (graticule edge labels) reproject with the map → drawn on the
+  canvas in `renderMap` step 6, after labels. Meridians labelled at their topmost
+  visible point, parallels at their leftmost (sampling the line + picking the
+  extreme visible projected point). Text color/halo flip on background lightness.
+- **Decor** ("stickers": compass/cartouche/text/frame) are locked to the poster
+  and drawn as **DOM/SVG** over the canvas (`OverlayLayer`), positioned
+  poster-relative (0..1). This makes interactive editing trivial; M6 export must
+  rasterize them onto the canvas separately.
+
+### Editing without blocking the map
+- `.overlay-layer` is `pointer-events: none`; only overlay items/handles are
+  `auto`. So dragging on empty space still hits the canvas → the map stays
+  draggable/zoomable "through" the overlay layer. Map pointer-down also
+  deselects the current overlay (via `onBackgroundPointerDown`).
+- Transform handles are children of the (rotated) item container, so they follow
+  rotation for free. Resize = cursor distance to center ratio; rotate = angle
+  delta about center (Shift snaps to 15°); move snaps x/y to 0.5.
+- Overlays are sized **poster-relative** (fractions of poster height × scale) so
+  they hold proportion on resize and will export at any DPI.
+
+### MapCanvas children slot
+- `OverlayLayer` is passed as `children` and rendered inside `.map-canvas-wrap`,
+  so it's pixel-aligned with the canvas without brittle offset math.
+
 ## M4b — Raster warping, Mercator tiles
 
 ### Same mesh, different uv

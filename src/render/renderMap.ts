@@ -6,6 +6,7 @@ import { lakes, rivers } from "../data/physical";
 import { getRoadsSync } from "../data/roads";
 import type { LayerSpec, StyleDef } from "../styles/styles";
 import { drawLabels } from "./labels";
+import { drawGraticuleLabels } from "./graticuleLabels";
 
 /** Warps a raster layer for the current view and returns a canvas to composite,
  *  or null if unavailable (GL off, texture/tiles loading). Provided by the host,
@@ -34,8 +35,26 @@ export interface RenderOptions {
   pixelRatio: number;
   /** Draw labels + high-detail raster mesh (skipped during interaction). */
   showLabels?: boolean;
+  /** Draw graticule degree labels along the frame edge. */
+  showGraticuleLabels?: boolean;
   /** Host-provided raster warping for satellite/terrain styles (optional). */
   renderRaster?: RenderRaster;
+}
+
+function isDark(color: string | undefined): boolean {
+  if (!color) return false;
+  let r = 0, g = 0, b = 0;
+  if (color.startsWith("#")) {
+    const h = color.slice(1);
+    r = parseInt(h.slice(0, 2), 16);
+    g = parseInt(h.slice(2, 4), 16);
+    b = parseInt(h.slice(4, 6), 16);
+  } else {
+    const m = color.match(/(\d+),\s*(\d+),\s*(\d+)/);
+    if (!m) return false;
+    [r, g, b] = [+m[1], +m[2], +m[3]];
+  }
+  return 0.299 * r + 0.587 * g + 0.114 * b < 110;
 }
 
 interface LayerContext {
@@ -127,6 +146,19 @@ export function renderMap(
       height,
       capability,
     );
+  }
+
+  // 6. Graticule degree labels (geographic overlay, prj.md §5.6).
+  if (opts.showGraticuleLabels) {
+    const grat = style.layers.find((l) => l.type === "graticule");
+    const bg = style.layers.find((l) => l.type === "background");
+    const dark = isDark(bg?.fill);
+    drawGraticuleLabels(ctx, projection, capability, width, height, {
+      step: grat?.step ?? 15,
+      color: dark ? "#ece4d4" : "#4a3f2c",
+      halo: dark ? "rgba(6,12,22,0.75)" : bg?.fill ?? "rgba(255,255,255,0.85)",
+      font: "500 11px 'EB Garamond', Georgia, serif",
+    });
   }
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import versor from "versor";
 import { getProjectionDef, type ProjectionId } from "../geo/projections";
 import { getWorld, type DetailLevel } from "../geo/data";
@@ -24,12 +24,18 @@ interface Props {
   style: StyleDef;
   /** Region-scale satellite tile source config. */
   tileConfig: TileConfig;
+  /** Draw graticule degree labels along the frame edge. */
+  showGraticuleLabels: boolean;
   /** Selected region to center + fit, or null for a world fit. */
   region: GazetteerEntry | null;
   /** Bumps each time a region is (re-)selected, to force a re-fit. */
   selectionNonce: number;
   /** Bumping this integer re-fits the current region/world to the viewport. */
   resetNonce: number;
+  /** Fired on map pointer-down (used to deselect decor overlays). */
+  onBackgroundPointerDown?: () => void;
+  /** Decor overlay layer, rendered aligned over the canvas. */
+  children?: ReactNode;
 }
 
 // Blue Marble equirect is ~5400px wide; below this many BM px across the view we
@@ -43,9 +49,12 @@ export function MapCanvas({
   projectionId,
   style,
   tileConfig,
+  showGraticuleLabels,
   region,
   selectionNonce,
   resetNonce,
+  onBackgroundPointerDown,
+  children,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,6 +73,10 @@ export function MapCanvas({
   styleRef.current = style;
   const tileConfigRef = useRef(tileConfig);
   tileConfigRef.current = tileConfig;
+  const gratLabelsRef = useRef(showGraticuleLabels);
+  gratLabelsRef.current = showGraticuleLabels;
+  const bgPointerRef = useRef(onBackgroundPointerDown);
+  bgPointerRef.current = onBackgroundPointerDown;
   const regionRef = useRef(region);
   regionRef.current = region;
   // Labels are skipped while the user is actively dragging/zooming.
@@ -156,6 +169,7 @@ export function MapCanvas({
       height,
       pixelRatio: dpr,
       showLabels: labelsRef.current,
+      showGraticuleLabels: gratLabelsRef.current,
       renderRaster,
     });
   };
@@ -202,12 +216,12 @@ export function MapCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectionId, region, selectionNonce, resetNonce]);
 
-  // Style or tile-source change only needs a redraw (view unchanged).
+  // Style / tile-source / overlay-toggle change only needs a redraw.
   useEffect(() => {
     labelsRef.current = true;
     scheduleDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [style, tileConfig]);
+  }, [style, tileConfig, showGraticuleLabels]);
 
   // Force-load bundled fonts, then redraw so canvas text uses them (canvas
   // won't lazy-trigger a webfont fetch on its own).
@@ -292,6 +306,7 @@ export function MapCanvas({
     const onPointerDown = (e: PointerEvent) => {
       const view = viewRef.current;
       if (!view) return;
+      bgPointerRef.current?.(); // deselect decor overlays when grabbing the map
       dragging = true;
       canvas.setPointerCapture(e.pointerId);
       const cap = getProjectionDef(projectionIdRef.current).capability;
@@ -398,6 +413,7 @@ export function MapCanvas({
   return (
     <div ref={wrapRef} className="map-canvas-wrap">
       <canvas ref={canvasRef} className="map-canvas" />
+      {children}
     </div>
   );
 }
