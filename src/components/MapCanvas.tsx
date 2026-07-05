@@ -44,6 +44,10 @@ interface Props {
   tileConfig: TileConfig;
   /** Draw graticule degree labels along the frame edge. */
   showGraticuleLabels: boolean;
+  /** Draw equator / tropics / polar-circle reference lines. */
+  showReferenceLines: boolean;
+  /** Draw a scale bar. */
+  showScaleBar: boolean;
   /** Poster aspect ratio (width / height). */
   aspect: number;
   /** Selected region to center + fit, or null for a world fit. */
@@ -74,6 +78,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
     style,
     tileConfig,
     showGraticuleLabels,
+    showReferenceLines,
+    showScaleBar,
     aspect,
     region,
     selectionNonce,
@@ -103,6 +109,10 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
   tileConfigRef.current = tileConfig;
   const gratLabelsRef = useRef(showGraticuleLabels);
   gratLabelsRef.current = showGraticuleLabels;
+  const refLinesRef = useRef(showReferenceLines);
+  refLinesRef.current = showReferenceLines;
+  const scaleBarRef = useRef(showScaleBar);
+  scaleBarRef.current = showScaleBar;
   const aspectRef = useRef(aspect);
   aspectRef.current = aspect;
   const bgPointerRef = useRef(onBackgroundPointerDown);
@@ -240,6 +250,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
       pixelRatio: dpr,
       showLabels: labelsRef.current,
       showGraticuleLabels: gratLabelsRef.current,
+      showReferenceLines: refLinesRef.current,
+      showScaleBar: scaleBarRef.current,
       renderRaster,
     });
     if (frameSourceRef.current !== activeSourceRef.current) {
@@ -295,7 +307,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
     labelsRef.current = true;
     scheduleDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [style, tileConfig, showGraticuleLabels]);
+  }, [style, tileConfig, showGraticuleLabels, showReferenceLines, showScaleBar]);
 
   // Force-load bundled fonts, then redraw so canvas text uses them (canvas
   // won't lazy-trigger a webfont fetch on its own).

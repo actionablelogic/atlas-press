@@ -92,6 +92,48 @@ export const BASEMAP_SOURCES: TileSource[] = [
     usageNote: "Attribution required; verify Esri's terms before selling prints.",
     kind: "basemap",
   },
+  {
+    id: "esri-natgeo",
+    label: "NatGeo (Esri)",
+    urlTemplate:
+      "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}",
+    minZoom: 0,
+    maxZoom: 16,
+    tileSize: 256,
+    attribution: "National Geographic, Esri, Garmin, HERE, USGS, NASA",
+    license: "Esri / NatGeo — attribution required; see terms for print",
+    commercial: "attribution",
+    usageNote: "Attribution required; verify Esri/NatGeo terms before selling prints.",
+    kind: "basemap",
+  },
+  {
+    id: "esri-ocean",
+    label: "Ocean (Esri)",
+    urlTemplate:
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}",
+    minZoom: 0,
+    maxZoom: 16,
+    tileSize: 256,
+    attribution: "Esri, GEBCO, NOAA, National Geographic, Garmin, HERE",
+    license: "Esri — attribution required; see Esri terms for print",
+    commercial: "attribution",
+    usageNote: "Attribution required; verify Esri's terms before selling prints.",
+    kind: "basemap",
+  },
+  {
+    id: "esri-street",
+    label: "Streets (Esri)",
+    urlTemplate:
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    minZoom: 0,
+    maxZoom: 19,
+    tileSize: 256,
+    attribution: "Esri, HERE, Garmin, USGS, NGA, OpenStreetMap contributors",
+    license: "Esri — attribution required; see Esri terms for print",
+    commercial: "attribution",
+    usageNote: "Attribution required; verify Esri's terms before selling prints.",
+    kind: "basemap",
+  },
 ];
 
 export const TILE_SOURCES: TileSource[] = [

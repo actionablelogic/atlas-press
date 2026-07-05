@@ -51,6 +51,8 @@ export default function App() {
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
   const [geoOverlays, setGeoOverlays] = useState<GeoOverlayConfig>({
     graticuleLabels: false,
+    referenceLines: false,
+    scaleBar: false,
   });
   const [aspectId, setAspectId] = useState("2:3");
   const [orientation, setOrientation] = useState<Orientation>("portrait");
@@ -82,7 +84,11 @@ export default function App() {
     setOverrides(doc.overrides ?? EMPTY_OVERRIDES);
     setTileConfig({ sourceId: doc.tileSourceId ?? "eox-s2cloudless" });
     setOverlays(doc.overlays ?? []);
-    setGeoOverlays({ graticuleLabels: !!doc.graticuleLabels });
+    setGeoOverlays({
+      graticuleLabels: !!doc.graticuleLabels,
+      referenceLines: !!doc.referenceLines,
+      scaleBar: !!doc.scaleBar,
+    });
     setAspectId(doc.aspectId ?? "2:3");
     setOrientation(doc.orientation ?? "portrait");
     const entry = doc.regionId
@@ -110,6 +116,8 @@ export default function App() {
     tileSourceId: tileConfig.sourceId,
     overlays,
     graticuleLabels: geoOverlays.graticuleLabels,
+    referenceLines: geoOverlays.referenceLines,
+    scaleBar: geoOverlays.scaleBar,
     aspectId,
     orientation,
     regionId: selection.entry?.id ?? null,
@@ -280,6 +288,8 @@ export default function App() {
             style={style}
             tileConfig={tileConfig}
             showGraticuleLabels={geoOverlays.graticuleLabels}
+            showReferenceLines={geoOverlays.referenceLines}
+            showScaleBar={geoOverlays.scaleBar}
             aspect={aspect}
             region={selection.entry}
             selectionNonce={selection.nonce}
@@ -305,7 +315,7 @@ export default function App() {
           projectionId={projectionId}
           style={style}
           tileConfig={tileConfig}
-          showGraticuleLabels={geoOverlays.graticuleLabels}
+          geo={geoOverlays}
           overlays={overlays}
           credit={credit}
           usage={usage}

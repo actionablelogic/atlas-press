@@ -23,6 +23,8 @@ export interface ExportRequest {
   style: StyleDef;
   tileConfig: TileConfig;
   showGraticuleLabels: boolean;
+  showReferenceLines: boolean;
+  showScaleBar: boolean;
   overlays: Overlay[];
   footer: string | null;
   previewW: number;
@@ -160,6 +162,8 @@ export async function renderExport(req: ExportRequest): Promise<Blob> {
       renderScale: k,
       showLabels: true,
       showGraticuleLabels: req.showGraticuleLabels,
+      showReferenceLines: req.showReferenceLines,
+      showScaleBar: req.showScaleBar,
       renderRaster: renderRaster as never,
     });
     ctx.save();

@@ -36,6 +36,20 @@ presets, and URL/file sharing. See per-milestone sections below and `NOTES.md`.
 - Vector tiles (Protomaps) for infinite-zoom vector city detail remain a future
   phase (this expansion chose raster street tiles).
 
+## Batch 1 additions (styles + reference overlays)
+
+- **5 more styles** (18 total): vector **Ink** (pen-and-ink) + **Midnight** (dark
+  vector globe); raster basemaps **NatGeo**, **Ocean**, **Streets (Esri)** — all
+  free Esri services (CORS-verified), classified "OK with attribution".
+- **Reference lines** overlay: equator (solid) + tropics + polar circles
+  (dashed), labelled, reproject with the map, colour adapts to light/dark bg.
+- **Scale bar** overlay with a "scale true here" caveat — computes local
+  metres/pixel at its position (scale is only locally exact on most projections),
+  rounds to a nice 1/2/5 value, bottom-left.
+- Both are geographic overlays drawn in `render/referenceOverlays.ts`, toggled in
+  the Overlays panel (`GeoOverlayConfig.referenceLines` / `.scaleBar`), threaded
+  through export + URL/file sharing, and scaled for high-DPI export.
+
 ## Commercial-use / licence badge
 
 Live "usage" badge (topbar + export dialog) that classifies the current poster

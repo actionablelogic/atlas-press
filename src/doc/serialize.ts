@@ -16,6 +16,8 @@ export interface PosterDoc {
   tileSourceId: string;
   overlays: Overlay[];
   graticuleLabels: boolean;
+  referenceLines?: boolean;
+  scaleBar?: boolean;
   aspectId: string;
   orientation: Orientation;
   regionId: string | null;

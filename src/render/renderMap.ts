@@ -7,6 +7,7 @@ import { getRoadsSync } from "../data/roads";
 import type { LayerSpec, StyleDef } from "../styles/styles";
 import { drawLabels } from "./labels";
 import { drawGraticuleLabels } from "./graticuleLabels";
+import { drawReferenceLines, drawScaleBar } from "./referenceOverlays";
 
 /** Warps a raster layer for the current view and returns a canvas to composite,
  *  or null if unavailable (GL off, texture/tiles loading). Provided by the host,
@@ -37,6 +38,10 @@ export interface RenderOptions {
   showLabels?: boolean;
   /** Draw graticule degree labels along the frame edge. */
   showGraticuleLabels?: boolean;
+  /** Draw equator / tropics / polar-circle reference lines. */
+  showReferenceLines?: boolean;
+  /** Draw a scale bar (with a "true here" caveat). */
+  showScaleBar?: boolean;
   /** Multiplier for stroke widths / font sizes (>1 for high-DPI export). */
   renderScale?: number;
   /** Host-provided raster warping for satellite/terrain styles (optional). */
@@ -147,17 +152,29 @@ export function renderMap(
     drawLabels(ctx, projection, labels.labelClasses, width, height, capability, s);
   }
 
-  // 6. Graticule degree labels (geographic overlay, prj.md §5.6).
+  // 6. Geographic overlays (prj.md §5.6): degree labels, reference lines, scale.
+  const bg = style.layers.find((l) => l.type === "background");
+  const dark = isDark(bg?.fill);
   if (opts.showGraticuleLabels) {
     const grat = style.layers.find((l) => l.type === "graticule");
-    const bg = style.layers.find((l) => l.type === "background");
-    const dark = isDark(bg?.fill);
     drawGraticuleLabels(ctx, projection, capability, width, height, {
       step: grat?.step ?? 15,
       color: dark ? "#ece4d4" : "#4a3f2c",
       halo: dark ? "rgba(6,12,22,0.75)" : bg?.fill ?? "rgba(255,255,255,0.85)",
       fontSize: 11 * s,
       fontFamily: "'EB Garamond', Georgia, serif",
+      scale: s,
+    });
+  }
+  if (opts.showReferenceLines) {
+    drawReferenceLines(ctx, path, projection, capability, width, height, {
+      color: dark ? "#d98f78" : "#a24b34",
+      scale: s,
+    });
+  }
+  if (opts.showScaleBar) {
+    drawScaleBar(ctx, projection, width, height, {
+      color: dark ? "#e6dccb" : "#3a3128",
       scale: s,
     });
   }

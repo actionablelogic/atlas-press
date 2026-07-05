@@ -15,11 +15,16 @@ export type StyleId =
   | "vintage"
   | "noir"
   | "boldPolitical"
+  | "ink"
+  | "midnight"
   // raster basemaps (city-level)
   | "street"
   | "light"
   | "dark"
-  | "topographic";
+  | "topographic"
+  | "esriNatgeo"
+  | "esriOcean"
+  | "esriStreet";
 
 export type LabelKind = "ocean" | "country" | "capital" | "city";
 
@@ -346,6 +351,39 @@ const BOLD_POLITICAL: StyleDef = {
   ],
 };
 
+const INK: StyleDef = {
+  id: "ink",
+  label: "Ink",
+  character: "Fine pen-and-ink linework on cream",
+  group: "vector",
+  layers: [
+    { type: "background", fill: "#f4efe1", paper: true },
+    { type: "sphere", fill: "#faf6ec", stroke: "#1a1a1a", lineWidth: 1.1 },
+    { type: "graticule", stroke: "rgba(0,0,0,0.07)", lineWidth: 0.35, step: 15 },
+    { type: "land", stroke: "#1a1a1a", lineWidth: 0.6 },
+    { type: "rivers", stroke: "#555555", lineWidth: 0.4 },
+    { type: "borders", stroke: "#1a1a1a", lineWidth: 0.4, lineDash: [2, 2] },
+    { type: "labels", labelClasses: serifLabels("#1a1a1a", "rgba(250,246,236,0.85)") },
+  ],
+};
+
+const MIDNIGHT: StyleDef = {
+  id: "midnight",
+  label: "Midnight",
+  character: "Moody dark-blue vector globe",
+  group: "vector",
+  layers: [
+    { type: "background", fill: "#0b0f1a" },
+    { type: "sphere", fill: "#0e1524", stroke: "#33465e", lineWidth: 1.3 },
+    { type: "graticule", stroke: "rgba(130,160,200,0.12)", lineWidth: 0.4, step: 15 },
+    { type: "countries", palette: ["#1a2436", "#1d2a3c", "#202333", "#233040", "#1c2738", "#242c3e"], stroke: "#33445e", lineWidth: 0.4 },
+    { type: "land", stroke: "#3a4d6b", lineWidth: 0.6 },
+    { type: "rivers", stroke: "#2f4a66", lineWidth: 0.5 },
+    { type: "borders", stroke: "#38495f", lineWidth: 0.5 },
+    { type: "labels", labelClasses: sansLabels("#a9c0dd", "rgba(11,15,26,0.85)") },
+  ],
+};
+
 // --- raster basemaps (city-level tiles over a vector world base) -----
 interface BasemapColors {
   bg: string;
@@ -392,6 +430,15 @@ const DARK = basemapStyle("dark", "Dark", "Dark basemap — city level", "carto-
 const TOPOGRAPHIC = basemapStyle("topographic", "Topographic", "Contours & relief — city level", "esri-topo", {
   bg: "#e8e3d4", ocean: "#a9c9dd", land: "#ded8c4", coast: "#bdb59e", border: "#c3bba4", outline: "#8a7f68", grat: "rgba(90,80,60,0.14)",
 });
+const ESRI_NATGEO = basemapStyle("esriNatgeo", "NatGeo", "National-Geographic look — city level", "esri-natgeo", {
+  bg: "#efe6d0", ocean: "#c9dbe0", land: "#e4dcc4", coast: "#b8ac8e", border: "#c7bda0", outline: "#8a7f68", grat: "rgba(90,80,60,0.14)",
+});
+const ESRI_OCEAN = basemapStyle("esriOcean", "Ocean", "Bathymetry base — city level", "esri-ocean", {
+  bg: "#dbe8ee", ocean: "#a9c9dd", land: "#e8e4d8", coast: "#c9c2b2", border: "#cfc7b6", outline: "#6b7f8a", grat: "rgba(60,90,110,0.14)",
+});
+const ESRI_STREET = basemapStyle("esriStreet", "Streets (Esri)", "Esri street map — city level", "esri-street", {
+  bg: "#eeeae0", ocean: "#bcd4de", land: "#eae6da", coast: "#cfc8b8", border: "#d3ccbb", outline: "#8a7f68", grat: "rgba(90,80,60,0.12)",
+});
 
 export const STYLES: StyleDef[] = [
   CLASSIC_ATLAS,
@@ -401,12 +448,17 @@ export const STYLES: StyleDef[] = [
   VINTAGE,
   NOIR,
   BOLD_POLITICAL,
+  INK,
+  MIDNIGHT,
   TERRAIN,
   SATELLITE,
   STREET,
   LIGHT,
   DARK,
   TOPOGRAPHIC,
+  ESRI_NATGEO,
+  ESRI_OCEAN,
+  ESRI_STREET,
 ];
 
 export const STYLES_BY_ID: Record<StyleId, StyleDef> = Object.fromEntries(

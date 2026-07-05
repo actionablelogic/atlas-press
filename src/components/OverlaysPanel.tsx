@@ -3,6 +3,8 @@ import { FONTS } from "../styles/fonts";
 
 export interface GeoOverlayConfig {
   graticuleLabels: boolean;
+  referenceLines: boolean;
+  scaleBar: boolean;
 }
 
 interface Props {
@@ -54,6 +56,22 @@ export function OverlaysPanel({
           onChange={(e) => onGeoChange({ ...geo, graticuleLabels: e.target.checked })}
         />
         Graticule degree labels
+      </label>
+      <label className="cz-check">
+        <input
+          type="checkbox"
+          checked={geo.referenceLines}
+          onChange={(e) => onGeoChange({ ...geo, referenceLines: e.target.checked })}
+        />
+        Equator, tropics & polar circles
+      </label>
+      <label className="cz-check ov-geo">
+        <input
+          type="checkbox"
+          checked={geo.scaleBar}
+          onChange={(e) => onGeoChange({ ...geo, scaleBar: e.target.checked })}
+        />
+        Scale bar
       </label>
 
       <div className="ov-add">

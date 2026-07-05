@@ -3,6 +3,7 @@ import type { ProjectionId } from "../geo/projections";
 import type { StyleDef } from "../styles/styles";
 import type { Overlay } from "../overlays/types";
 import type { ExportState, TileConfig } from "./MapCanvas";
+import type { GeoOverlayConfig } from "./OverlaysPanel";
 import type { UsageInfo } from "../doc/usage";
 import {
   computeDims,
@@ -19,7 +20,7 @@ interface Props {
   projectionId: ProjectionId;
   style: StyleDef;
   tileConfig: TileConfig;
-  showGraticuleLabels: boolean;
+  geo: GeoOverlayConfig;
   overlays: Overlay[];
   credit: string;
   usage: UsageInfo;
@@ -42,7 +43,7 @@ export function ExportDialog({
   projectionId,
   style,
   tileConfig,
-  showGraticuleLabels,
+  geo,
   overlays,
   credit,
   usage,
@@ -85,7 +86,7 @@ export function ExportDialog({
         projectionId,
         view: state.view,
         style,
-        showGraticuleLabels,
+        showGraticuleLabels: geo.graticuleLabels,
         overlays,
         footer,
         previewW: state.width,
@@ -104,7 +105,9 @@ export function ExportDialog({
         view: state.view,
         style,
         tileConfig,
-        showGraticuleLabels,
+        showGraticuleLabels: geo.graticuleLabels,
+        showReferenceLines: geo.referenceLines,
+        showScaleBar: geo.scaleBar,
         overlays,
         footer,
         previewW: state.width,
