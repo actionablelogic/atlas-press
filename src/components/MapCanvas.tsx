@@ -128,8 +128,25 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
   const renderRaster: RenderRaster = (layer, projection, width, height, gridCols) => {
     const warper = warperRef.current;
     const mosaic = mosaicRef.current;
-    if (!warper?.supported || !layer.texture) return null;
+    if (!warper?.supported) return null;
 
+    // Basemap tile styles (street/dark/topo…): region tiles over the vector
+    // base. At world/continent-wide scale the mosaic bails → vector base shows.
+    if (layer.basemap) {
+      const source = TILE_SOURCES_BY_ID[layer.basemap];
+      const bbox = visibleBbox(projection, width, height);
+      if (!mosaic || !source || !bbox) return null;
+      if (labelsRef.current) mosaic.update(projection, width, height, { source });
+      const mt = mosaic.texture;
+      if (!mt) return null;
+      warper.drawMesh(projection, width, height, gridCols, mt, mosaic.uvFn, {
+        wrap: false,
+        clear: true,
+      });
+      return warper.commit();
+    }
+
+    if (!layer.texture) return null;
     if (layer.texture === "terrain") {
       const tex = warper.ensureEquirect("terrain");
       if (!tex) return null;
@@ -137,7 +154,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
         wrap: true,
         clear: true,
       });
-      return warper.canvas;
+      return warper.commit();
     }
 
     // satellite
@@ -154,7 +171,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
         wrap: true,
         clear: true,
       });
-      return warper.canvas;
+      return warper.commit();
     }
 
     // Region scale. Refresh tiles only when idle (not mid-drag) to avoid thrash.
@@ -181,7 +198,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
         clear: !drewBase,
       });
     }
-    return drewBase || mtex ? warper.canvas : null;
+    return drewBase || mtex ? warper.commit() : null;
   };
 
   // --- drawing ---------------------------------------------------------

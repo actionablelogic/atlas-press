@@ -247,8 +247,12 @@ export function applyOverrides(preset: StyleDef, ov: StyleOverrides): StyleDef {
     if (ov.ocean) l.fill = ov.ocean;
     out.push(l);
   }
+  // Texture rasters (satellite/terrain) are the base: draw them before the
+  // vector layers so borders/labels overlay the imagery. Basemap tiles instead
+  // sit ON TOP of a vector world-scale base (land fill + borders), so they're
+  // drawn after the content layers below.
   const raster = byType.get("raster");
-  if (raster) out.push(clone(raster));
+  if (raster && !raster.basemap) out.push(clone(raster));
 
   for (const type of CONTENT_ORDER) {
     if (type === "coastVignette") {
@@ -271,6 +275,9 @@ export function applyOverrides(preset: StyleDef, ov: StyleOverrides): StyleDef {
     }
     out.push(layer);
   }
+
+  // Basemap tiles overlay the vector base.
+  if (raster && raster.basemap) out.push(clone(raster));
 
   // Labels: build from the toggleable kinds so classes can be added or removed.
   const labelsLayer = byType.get("labels");

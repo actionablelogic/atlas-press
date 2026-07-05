@@ -3,10 +3,38 @@
 Tracking implementation progress against the milestones in `prj.md`.
 
 **All milestones complete: M1, M2, M3, M3b, M4a, M4b, M5, M6, M7.** Atlas Press
-is a working v1 — 9 projections, region search, 4 style presets + a full
+is a working v1 — 9 projections, region search, style presets + a full
 customize panel, equirectangular + Mercator-tile raster warping, decor overlays
 with transform handles, high-DPI streaming export (PNG/JPEG/SVG), poster aspect
 presets, and URL/file sharing. See per-milestone sections below and `NOTES.md`.
+
+## Scope expansion (post-v1): more styles + city-level detail
+
+- **13 styles now**, grouped Vector / Raster in the picker:
+  - Vector presets: Classic Atlas, Minimal, **Antique Atlas, Blueprint, Vintage,
+    Noir, Bold Political**.
+  - Raster: Terrain, Satellite, **Street, Light, Dark, Topographic**.
+- **City-level detail** via raster basemap tiles (CARTO Voyager/Positron/Dark
+  Matter, Esri World Topo — all CORS-open, free w/ attribution), warped through
+  the existing Mercator mosaic. Basemap styles are **two-tier**: a vector world
+  base at world scale, warped street tiles at region/city scale. Esri satellite
+  already reached z19; basemaps go to z20.
+- Per-source attribution surfaced in the map credit; picker grouped by kind.
+
+### Bug fixed during expansion
+- `applyOverrides` rebuilt layers into a fixed order that placed the **raster
+  layer before the `land` fill** — fine for satellite/terrain (borders/labels
+  overlay imagery) but the basemap `land` fill then **covered the tiles**
+  (blank map). Fix: texture rasters draw before the vector layers; **basemap
+  rasters draw after** them (tiles on top of the vector base). Also added a
+  `RasterWarper.commit()` 2D snapshot + `preserveDrawingBuffer` so the GL warp
+  is a stable `drawImage` source across rAF cycles.
+
+### Follow-ups
+- Basemap world scale shows the vector base (not global low-zoom tiles) — a true
+  global mosaic (antimeridian wrap) is a later nicety.
+- Vector tiles (Protomaps) for infinite-zoom vector city detail remain a future
+  phase (this expansion chose raster street tiles).
 
 ## Current milestone: M7 — Polish
 

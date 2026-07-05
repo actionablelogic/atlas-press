@@ -50,12 +50,22 @@ export async function renderExport(req: ExportRequest): Promise<Blob> {
   // --- raster preparation (equirect load / tile mosaic at export scale) ---
   let warper: RasterWarper | null = null;
   let mosaic: MercatorMosaic | null = null;
-  let rasterMode: "terrain" | "sat-world" | "sat-tiles" | null = null;
+  let rasterMode: "terrain" | "sat-world" | "sat-tiles" | "basemap" | null = null;
   const rasterLayer = style.layers.find((l) => l.type === "raster");
   if (rasterLayer) {
     warper = new RasterWarper();
     if (warper.supported) {
-      if (rasterLayer.texture === "terrain") {
+      if (rasterLayer.basemap) {
+        const source = TILE_SOURCES_BY_ID[rasterLayer.basemap];
+        const full = projAt(projectionId, view, k, 0);
+        const bbox = visibleBbox(full, dims.width, dims.height);
+        if (source && bbox) {
+          mosaic = new MercatorMosaic(warper);
+          await mosaic.assemble(full, dims.width, dims.height, { source });
+          rasterMode = "basemap";
+        }
+        // else: world-wide → no tiles; the vector base layers render.
+      } else if (rasterLayer.texture === "terrain") {
         await warper.loadEquirect("terrain");
         rasterMode = "terrain";
       } else {
@@ -89,17 +99,23 @@ export async function renderExport(req: ExportRequest): Promise<Blob> {
     height: number,
   ): HTMLCanvasElement | null => {
     if (!warper?.supported) return null;
+    if (rasterMode === "basemap") {
+      const mt = mosaic?.texture;
+      if (!mt) return null;
+      warper.drawMesh(projection, width, height, grid, mt, mosaic!.uvFn, { wrap: false, clear: true });
+      return warper.commit();
+    }
     if (rasterMode === "terrain") {
       const t = warper.ensureEquirect("terrain");
       if (!t) return null;
       warper.drawMesh(projection, width, height, grid, t, equirectUv, { wrap: true, clear: true });
-      return warper.canvas;
+      return warper.commit();
     }
     const bm = warper.ensureEquirect("satellite");
     if (rasterMode === "sat-world") {
       if (!bm) return null;
       warper.drawMesh(projection, width, height, grid, bm, equirectUv, { wrap: true, clear: true });
-      return warper.canvas;
+      return warper.commit();
     }
     // sat-tiles
     let base = false;
@@ -111,7 +127,7 @@ export async function renderExport(req: ExportRequest): Promise<Blob> {
     if (mt) {
       warper.drawMesh(projection, width, height, grid, mt, mosaic!.uvFn, { wrap: false, clear: !base });
     }
-    return base || mt ? warper.canvas : null;
+    return base || mt ? warper.commit() : null;
   };
 
   // --- strip render ---

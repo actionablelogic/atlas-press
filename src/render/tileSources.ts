@@ -14,9 +14,63 @@ export interface TileSource {
   attribution: string;
   /** Short license note surfaced in the UI. */
   license: string;
+  /** "imagery" = satellite tier; "basemap" = street/topo/etc. map tiles. */
+  kind: "imagery" | "basemap";
   /** True → needs the user's apiKey filled in before use. */
   requiresKey?: boolean;
 }
+
+const CARTO = (id: string) =>
+  `https://basemaps.cartocdn.com/rastertiles/${id}/{z}/{x}/{y}.png`;
+
+/** Free-to-use basemap tile sources for city-level detail (all CORS-open). */
+export const BASEMAP_SOURCES: TileSource[] = [
+  {
+    id: "carto-voyager",
+    label: "Street (CARTO Voyager)",
+    urlTemplate: CARTO("voyager"),
+    minZoom: 0,
+    maxZoom: 20,
+    tileSize: 256,
+    attribution: "© OpenStreetMap contributors © CARTO",
+    license: "CARTO basemaps — free with attribution",
+    kind: "basemap",
+  },
+  {
+    id: "carto-positron",
+    label: "Light (CARTO Positron)",
+    urlTemplate: CARTO("light_all"),
+    minZoom: 0,
+    maxZoom: 20,
+    tileSize: 256,
+    attribution: "© OpenStreetMap contributors © CARTO",
+    license: "CARTO basemaps — free with attribution",
+    kind: "basemap",
+  },
+  {
+    id: "carto-dark",
+    label: "Dark (CARTO Dark Matter)",
+    urlTemplate: CARTO("dark_all"),
+    minZoom: 0,
+    maxZoom: 20,
+    tileSize: 256,
+    attribution: "© OpenStreetMap contributors © CARTO",
+    license: "CARTO basemaps — free with attribution",
+    kind: "basemap",
+  },
+  {
+    id: "esri-topo",
+    label: "Topographic (Esri)",
+    urlTemplate:
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    minZoom: 0,
+    maxZoom: 19,
+    tileSize: 256,
+    attribution: "Esri, HERE, Garmin, USGS, NGA",
+    license: "Esri — attribution required; see Esri terms for print",
+    kind: "basemap",
+  },
+];
 
 export const TILE_SOURCES: TileSource[] = [
   {
@@ -29,6 +83,7 @@ export const TILE_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "Sentinel-2 cloudless 2020 by EOX IT Services GmbH",
     license: "CC-BY-NC-SA 4.0 — non-commercial",
+    kind: "imagery",
   },
   {
     id: "esri-world-imagery",
@@ -40,6 +95,7 @@ export const TILE_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "Esri, Maxar, Earthstar Geographics",
     license: "Esri — attribution required; see Esri terms for print",
+    kind: "imagery",
   },
   {
     id: "custom",
@@ -50,12 +106,14 @@ export const TILE_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "User-supplied source",
     license: "Per your source's terms",
+    kind: "imagery",
     requiresKey: true,
   },
 ];
 
+/** Every registered source (imagery + basemap), keyed by id. */
 export const TILE_SOURCES_BY_ID: Record<string, TileSource> = Object.fromEntries(
-  TILE_SOURCES.map((s) => [s.id, s]),
+  [...TILE_SOURCES, ...BASEMAP_SOURCES].map((s) => [s.id, s]),
 );
 
 export function tileUrl(

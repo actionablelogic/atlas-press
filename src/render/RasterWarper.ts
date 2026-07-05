@@ -53,6 +53,8 @@ export interface DrawMeshOptions {
 
 export class RasterWarper {
   readonly canvas: HTMLCanvasElement;
+  /** Stable 2D snapshot of the last warp (see commit()). */
+  private out: HTMLCanvasElement;
   private gl: WebGL2RenderingContext | null;
   private program: WebGLProgram | null = null;
   private vbo: WebGLBuffer | null = null;
@@ -65,10 +67,15 @@ export class RasterWarper {
 
   constructor() {
     this.canvas = document.createElement("canvas");
+    this.out = document.createElement("canvas");
     this.gl = this.canvas.getContext("webgl2", {
       alpha: true,
       premultipliedAlpha: true,
       antialias: false,
+      // The canvas is used as a drawImage() source across rAF cycles, so the
+      // drawing buffer must survive until it's composited (otherwise basemap
+      // warps that draw once per view read back blank).
+      preserveDrawingBuffer: true,
     });
     if (this.gl) this.init(this.gl);
   }
@@ -101,6 +108,23 @@ export class RasterWarper {
     const h = Math.max(1, Math.round(height * dpr));
     if (this.canvas.width !== w) this.canvas.width = w;
     if (this.canvas.height !== h) this.canvas.height = h;
+    if (this.out.width !== w) this.out.width = w;
+    if (this.out.height !== h) this.out.height = h;
+  }
+
+  /**
+   * Snapshot the current GL warp into a stable 2D canvas and return it. The
+   * GL→2D copy happens synchronously (drawing buffer still valid); returning the
+   * 2D canvas decouples compositing from the GL buffer's lifetime, which is
+   * unreliable to drawImage() directly under some drivers (blank/flicker).
+   */
+  commit(): HTMLCanvasElement {
+    const ctx = this.out.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, this.out.width, this.out.height);
+      ctx.drawImage(this.canvas, 0, 0);
+    }
+    return this.out;
   }
 
   // --- texture helpers (used by the Mercator mosaic) -------------------

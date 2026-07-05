@@ -182,8 +182,10 @@ export default function App() {
     setSelectedOverlay((s) => (s === id ? null : s));
   };
 
-  const credit =
-    styleId === "satellite"
+  const rasterLayer = style.layers.find((l) => l.type === "raster");
+  const credit = rasterLayer?.basemap
+    ? `${TILE_SOURCES_BY_ID[rasterLayer.basemap]?.attribution ?? ""} · Natural Earth`
+    : styleId === "satellite"
       ? `${TILE_SOURCES_BY_ID[tileConfig.sourceId]?.attribution ?? ""} · NASA Blue Marble (world) · Natural Earth`
       : styleId === "terrain"
         ? "Natural Earth II shaded relief · Natural Earth"

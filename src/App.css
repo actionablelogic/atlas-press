@@ -303,6 +303,10 @@ body {
   margin-top: 1.25rem;
 }
 
+.style-group + .style-group {
+  margin-top: 0.6rem;
+}
+
 .picker-title {
   font-size: 0.75rem;
   text-transform: uppercase;
