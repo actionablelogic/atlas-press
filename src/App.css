@@ -51,6 +51,73 @@ body {
 
 .topbar-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* --- usage / licence badge --- */
+.usage-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: help;
+  white-space: nowrap;
+}
+.tone-ok {
+  background: #dceadd;
+  color: #2f6b3a;
+  border-color: #b6d3ba;
+}
+.tone-warn {
+  background: #f4e6c8;
+  color: #8a6a1e;
+  border-color: #e0c88c;
+}
+.tone-block {
+  background: #f0d3cf;
+  color: #9a3327;
+  border-color: #dcaea7;
+}
+
+.usage-block {
+  margin: 0.6rem 0 0.4rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.usage-block.tone-ok {
+  background: #dceadd;
+  border-color: #b6d3ba;
+}
+.usage-block.tone-warn {
+  background: #f4e6c8;
+  border-color: #e0c88c;
+}
+.usage-block.tone-block {
+  background: #f0d3cf;
+  border-color: #dcaea7;
+}
+.usage-block-head {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.tone-ok .usage-block-head {
+  color: #2f6b3a;
+}
+.tone-warn .usage-block-head {
+  color: #8a6a1e;
+}
+.tone-block .usage-block-head {
+  color: #9a3327;
+}
+.usage-block-detail {
+  font-size: 0.72rem;
+  color: #4a3f2c;
+  margin-top: 0.2rem;
+  line-height: 1.4;
 }
 
 /* --- search combobox --- */

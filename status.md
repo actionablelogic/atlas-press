@@ -36,6 +36,23 @@ presets, and URL/file sharing. See per-milestone sections below and `NOTES.md`.
 - Vector tiles (Protomaps) for infinite-zoom vector city detail remain a future
   phase (this expansion chose raster street tiles).
 
+## Commercial-use / licence badge
+
+Live "usage" badge (topbar + export dialog) that classifies the current poster
+(prj.md §8) so you don't accidentally violate a licence:
+- **✓ Freely sellable** (green) — Natural Earth (PD) / NASA Blue Marble (world
+  satellite) / all vector + terrain styles.
+- **⚠ OK with attribution** (amber) — Esri imagery/topo, CARTO basemaps
+  (attribution required; verify provider print terms).
+- **⚠ Personal use only** (red) — EOX Sentinel-2 region satellite (CC-BY-NC-SA).
+- **⚠ Check source terms** (amber) — user's custom tile source.
+
+It's **view-aware**: `MapCanvas` reports which tile source is actually painting
+the current frame (`onActiveTileSource`), so world-scale Satellite (Blue Marble)
+reads "sellable" while zooming to region (Sentinel-2) flips to "personal use
+only". Sources classified via `TileSource.commercial` + `usageNote`; computed by
+`doc/usage.ts:posterUsage`. Detail text appears next to the Export button.
+
 ## Current milestone: M7 — Polish
 
 > Poster aspect presets, URL sharing, keyboard a11y, mobile-usable preview,

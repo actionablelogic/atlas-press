@@ -54,6 +54,9 @@ interface Props {
   resetNonce: number;
   /** Fired on map pointer-down (used to deselect decor overlays). */
   onBackgroundPointerDown?: () => void;
+  /** Reports which tile source (if any) is currently painting the map, so the
+   *  usage/licence badge can reflect what's actually on the poster. */
+  onActiveTileSource?: (sourceId: string | null) => void;
   /** Decor overlay layer, rendered aligned over the canvas. */
   children?: ReactNode;
 }
@@ -76,6 +79,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
     selectionNonce,
     resetNonce,
     onBackgroundPointerDown,
+    onActiveTileSource,
     children,
   },
   ref,
@@ -103,6 +107,12 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
   aspectRef.current = aspect;
   const bgPointerRef = useRef(onBackgroundPointerDown);
   bgPointerRef.current = onBackgroundPointerDown;
+  const onActiveSourceRef = useRef(onActiveTileSource);
+  onActiveSourceRef.current = onActiveTileSource;
+  // Tile source painting the current frame (set by renderRaster) vs the last
+  // reported one — so we notify the host only when it changes.
+  const frameSourceRef = useRef<string | null>(null);
+  const activeSourceRef = useRef<string | null>(null);
   const regionRef = useRef(region);
   regionRef.current = region;
   // Labels are skipped while the user is actively dragging/zooming.
@@ -143,6 +153,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
         wrap: false,
         clear: true,
       });
+      frameSourceRef.current = layer.basemap; // basemap tiles are painting
       return warper.commit();
     }
 
@@ -197,6 +208,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
         wrap: false,
         clear: !drewBase,
       });
+      frameSourceRef.current = tileConfigRef.current.sourceId; // region satellite tiles
     }
     return drewBase || mtex ? warper.commit() : null;
   };
@@ -217,6 +229,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
 
     warperRef.current?.setSize(width, height, dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    frameSourceRef.current = null; // renderRaster sets this if tiles are painted
     renderMap(ctx, {
       projection: buildProjection(projectionId, view),
       world: getWorld(detailRef.current),
@@ -229,6 +242,10 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(
       showGraticuleLabels: gratLabelsRef.current,
       renderRaster,
     });
+    if (frameSourceRef.current !== activeSourceRef.current) {
+      activeSourceRef.current = frameSourceRef.current;
+      onActiveSourceRef.current?.(activeSourceRef.current);
+    }
   };
 
   const scheduleDraw = () => {

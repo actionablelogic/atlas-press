@@ -3,6 +3,7 @@ import type { ProjectionId } from "../geo/projections";
 import type { StyleDef } from "../styles/styles";
 import type { Overlay } from "../overlays/types";
 import type { ExportState, TileConfig } from "./MapCanvas";
+import type { UsageInfo } from "../doc/usage";
 import {
   computeDims,
   defaultDpi,
@@ -21,6 +22,7 @@ interface Props {
   showGraticuleLabels: boolean;
   overlays: Overlay[];
   credit: string;
+  usage: UsageInfo;
   getExportState: () => ExportState | null;
   onClose: () => void;
 }
@@ -43,6 +45,7 @@ export function ExportDialog({
   showGraticuleLabels,
   overlays,
   credit,
+  usage,
   getExportState,
   onClose,
 }: Props) {
@@ -224,6 +227,13 @@ export function ExportDialog({
               Large export — streamed encode may take 30–60 s.
             </div>
           )}
+        </div>
+
+        <div className={`usage-block tone-${usage.tone}`}>
+          <div className="usage-block-head">
+            {usage.tone === "ok" ? "✓" : "⚠"} {usage.label}
+          </div>
+          <div className="usage-block-detail">{usage.detail}</div>
         </div>
 
         {progress != null && (

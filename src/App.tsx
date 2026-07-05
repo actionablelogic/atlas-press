@@ -32,6 +32,7 @@ import {
   type Orientation,
 } from "./poster/aspects";
 import { readHash, writeHash, type PosterDoc } from "./doc/serialize";
+import { posterUsage } from "./doc/usage";
 import "./App.css";
 
 interface Selection {
@@ -57,6 +58,8 @@ export default function App() {
   const [resetNonce, setResetNonce] = useState(0);
   const [exportOpen, setExportOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [activeTileSource, setActiveTileSource] = useState<string | null>(null);
+  const usage = posterUsage(activeTileSource);
   const mapRef = useRef<MapCanvasHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -201,6 +204,12 @@ export default function App() {
           onClear={handleClear}
         />
         <div className="topbar-actions">
+          <span
+            className={`usage-badge tone-${usage.tone}`}
+            title={usage.detail}
+          >
+            {usage.tone === "ok" ? "✓" : "⚠"} {usage.label}
+          </span>
           <button type="button" className="btn" onClick={() => setResetNonce((n) => n + 1)}>
             Reset view
           </button>
@@ -276,6 +285,7 @@ export default function App() {
             selectionNonce={selection.nonce}
             resetNonce={resetNonce}
             onBackgroundPointerDown={() => setSelectedOverlay(null)}
+            onActiveTileSource={setActiveTileSource}
           >
             <OverlayLayer
               overlays={overlays}
@@ -298,6 +308,7 @@ export default function App() {
           showGraticuleLabels={geoOverlays.graticuleLabels}
           overlays={overlays}
           credit={credit}
+          usage={usage}
           getExportState={() => mapRef.current?.getExportState() ?? null}
           onClose={() => setExportOpen(false)}
         />
