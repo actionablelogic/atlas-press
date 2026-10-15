@@ -20,7 +20,7 @@ export interface GazetteerEntry {
 
 // --- curated continents & oceans -------------------------------------
 // bbox = [west, south, east, north]; west/east may exceed ±180 to describe
-// antimeridian-spanning framing (e.g. the Pacific). See prj.md §5.1.
+// antimeridian-spanning framing (e.g. the Pacific). See PRD.md §5.1.
 interface Curated {
   name: string;
   centroid: [number, number];
@@ -60,7 +60,7 @@ const OCEANS: Curated[] = [
     bbox: [-180, -78, 180, -50],
     suggest: "azimuthalEquidistant",
   },
-  // Major seas (see prj.md open question #4 — a sensible starter set)
+  // Major seas (see PRD.md open question #4 — a sensible starter set)
   { name: "Mediterranean Sea", centroid: [18, 35], bbox: [-6, 30, 37, 46] },
   { name: "Caribbean Sea", centroid: [-75, 15], bbox: [-89, 9, -60, 22] },
   { name: "South China Sea", centroid: [114, 12], bbox: [105, 3, 122, 23] },

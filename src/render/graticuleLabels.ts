@@ -25,7 +25,7 @@ export interface GraticuleLabelOptions {
 }
 
 /**
- * Degree labels along the frame edge (prj.md §5.6): meridians labelled at their
+ * Degree labels along the frame edge (PRD.md §5.6): meridians labelled at their
  * topmost visible point, parallels at their leftmost. Reprojects with the map.
  */
 export function drawGraticuleLabels(

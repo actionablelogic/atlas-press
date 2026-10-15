@@ -1,4 +1,4 @@
-// Poster overlays. Two families (prj.md §5.6):
+// Poster overlays. Two families (PRD.md §5.6):
 //  - Geographic overlays (graticule edge labels) reproject with the map and are
 //    drawn on the canvas — see render/graticuleLabels.ts.
 //  - Decor overlays ("stickers") are locked to the poster canvas and are freely

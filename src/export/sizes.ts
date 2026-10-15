@@ -52,7 +52,7 @@ export function computeDims(
   };
 }
 
-/** Sensible default DPI: A0-and-larger default to 200 (per prj.md §5.7). */
+/** Sensible default DPI: A0-and-larger default to 200 (per PRD.md §5.7). */
 export function defaultDpi(longEdgeIn: number): Dpi {
   return longEdgeIn >= 1189 / 25.4 ? 200 : 300;
 }

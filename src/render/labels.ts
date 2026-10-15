@@ -45,7 +45,7 @@ function overlaps(a: Box, boxes: Box[]): boolean {
  * Draw labels after projection: gather candidates per class (respecting each
  * class's minScale), skip anchors that are clipped/off-canvas/on the far side
  * of the globe, then greedily place by (priority, importance) rejecting
- * overlaps. See prj.md §5.5.
+ * overlaps. See PRD.md §5.5.
  */
 export function drawLabels(
   ctx: CanvasRenderingContext2D,

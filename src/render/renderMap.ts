@@ -152,7 +152,7 @@ export function renderMap(
     drawLabels(ctx, projection, labels.labelClasses, width, height, capability, s);
   }
 
-  // 6. Geographic overlays (prj.md §5.6): degree labels, reference lines, scale.
+  // 6. Geographic overlays (PRD.md §5.6): degree labels, reference lines, scale.
   const bg = style.layers.find((l) => l.type === "background");
   const dark = isDark(bg?.fill);
   if (opts.showGraticuleLabels) {

@@ -2,6 +2,12 @@
   "name": "atlas-press",
   "private": true,
   "version": "0.0.0",
+  "description": "Design printable map posters in real cartographic projections, in the browser.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/actionablelogic/atlas-press.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

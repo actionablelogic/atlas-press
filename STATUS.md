@@ -1,6 +1,6 @@
-# status.md — Progress Tracker
+# Atlas Press — Status
 
-Tracking implementation progress against the milestones in `prj.md`.
+Tracking implementation progress against the milestones in `PRD.md`.
 
 **All milestones complete: M1, M2, M3, M3b, M4a, M4b, M5, M6, M7.** Atlas Press
 is a working v1 — 9 projections, region search, style presets + a full
@@ -50,22 +50,22 @@ presets, and URL/file sharing. See per-milestone sections below and `NOTES.md`.
   the Overlays panel (`GeoOverlayConfig.referenceLines` / `.scaleBar`), threaded
   through export + URL/file sharing, and scaled for high-DPI export.
 
-## Commercial-use / licence badge
+## Licence notice badge
 
-Live "usage" badge (topbar + export dialog) that classifies the current poster
-(prj.md §8) so you don't accidentally violate a licence:
-- **✓ Freely sellable** (green) — Natural Earth (PD) / NASA Blue Marble (world
+Live licence-notice badge (topbar + export dialog) stating the terms of use of
+the data on the current poster (PRD.md §8):
+- **✓ Public domain data** (green) — Natural Earth (PD) / NASA Blue Marble (world
   satellite) / all vector + terrain styles.
-- **⚠ OK with attribution** (amber) — Esri imagery/topo, CARTO basemaps
-  (attribution required; verify provider print terms).
-- **⚠ Personal use only** (red) — EOX Sentinel-2 region satellite (CC-BY-NC-SA).
+- **⚠ Attribution required** (amber) — Esri imagery/topo, CARTO basemaps
+  (provider terms of use apply).
+- **⚠ Non-commercial licence** (red) — EOX Sentinel-2 region satellite (CC BY-NC-SA 4.0).
 - **⚠ Check source terms** (amber) — user's custom tile source.
 
 It's **view-aware**: `MapCanvas` reports which tile source is actually painting
 the current frame (`onActiveTileSource`), so world-scale Satellite (Blue Marble)
-reads "sellable" while zooming to region (Sentinel-2) flips to "personal use
-only". Sources classified via `TileSource.commercial` + `usageNote`; computed by
-`doc/usage.ts:posterUsage`. Detail text appears next to the Export button.
+reads "Public domain data" while zooming to region (Sentinel-2) flips to
+"Non-commercial licence". Sources classified via `TileSource.terms` + `usageNote`;
+computed by `doc/usage.ts:posterUsage`. Detail text appears next to the Export button.
 
 ## Current milestone: M7 — Polish
 
@@ -252,7 +252,7 @@ when zoomed to Italy, 97 after warping to Orthographic**, crisp imagery
 
 ## M3b — Customize panel (+ Hobo–Dyer)
 
-> Spec expanded (prj.md): styles are **presets + a user diff**, not fixed. Layer
+> Spec expanded (PRD.md): styles are **presets + a user diff**, not fixed. Layer
 > toggles, per-layer color/width, per-class typography, background & ocean colors.
 > Plus a 9th projection (Hobo–Dyer). **Exit test: recreate a passable Minimal
 > look starting from the Classic Atlas preset using only panel controls.**
@@ -390,7 +390,7 @@ Fixed by reversing the ring when `geoArea > 2π`. Continents/oceans now fit ~70%
 - Rivers are sparse at 110m (13 major rivers) — add 50m rivers/lakes for detail
 - Projection thumbnail mini-previews (still text cards)
 - Lazy-load bundled TopoJSON/GeoJSON out of the JS chunk (size warning)
-- Curved/area ocean labels + multilingual = v2 (per prj.md §5.5)
+- Curved/area ocean labels + multilingual = v2 (per PRD.md §5.5)
 
 ---
 
@@ -438,7 +438,7 @@ prior map showed only interior borders. Now continents fill correctly
 - Lazy-load 50m/10m TopoJSON out of the JS bundle (chunk-size warning)
 - France-type centroid: fine now via largest-landmass, but selecting "France"
   drops overseas territories from the initial frame (by design; user can pan)
-- Ocean/sea list is a starter set (prj.md open question #4)
+- Ocean/sea list is a starter set (PRD.md open question #4)
 
 ---
 
@@ -479,16 +479,13 @@ south-polar view without glitches (verified headless via playwright-core).
 ### Notes / decisions
 - See `NOTES.md` for rendering & interaction decisions.
 - **Follow-ups (not blocking M1):** projection thumbnail mini-previews per card
-  (`prj.md` §5.3 — currently text-only cards); lazy-load the 50m/10m TopoJSON
+  (`PRD.md` §5.3 — currently text-only cards); lazy-load the 50m/10m TopoJSON
   out of the JS bundle (Vite chunk-size warning); ⅙-rule Albers standard
   parallels (needs M2 region bbox).
 
 ## Upcoming milestones
 
-- M2 — Region search
-- M3 — Styles: Classic Atlas + Minimal
-- M4a — Raster warping (equirectangular)
-- M4b — Raster warping (Mercator tiles)
-- M5 — Overlays
-- M6 — Export
-- M7 — Polish
+None — all milestones (M1–M7) are complete. (This section previously listed
+every milestone as "upcoming" despite the summary above showing them all
+done — stale leftover from the initial template, removed during the
+context-file standardization pass.)

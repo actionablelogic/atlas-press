@@ -1,4 +1,4 @@
-# prj.md — "Atlas Press" : Custom Map Poster Builder
+# PRD.md — "Atlas Press" : Custom Map Poster Builder
 
 ## 1. Vision
 

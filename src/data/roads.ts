@@ -3,7 +3,7 @@ import type { FeatureCollection, Geometry } from "geojson";
 // Natural Earth 10m major highways (public domain). This is the only NE scale
 // with roads and it's a heavier asset (~2.3 MB filtered), so it's served from
 // /public and lazy-loaded the first time the roads layer is switched on — never
-// bundled, never fetched unless requested. (prj.md §5.4 / §8.)
+// bundled, never fetched unless requested. (PRD.md §5.4 / §8.)
 
 let roads: FeatureCollection<Geometry> | null = null;
 let loading = false;

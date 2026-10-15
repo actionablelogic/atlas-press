@@ -4,7 +4,7 @@ import riversRaw from "./ne_110m_rivers_lake_centerlines.json";
 import placesRaw from "./ne_110m_populated_places_simple.json";
 
 // Natural Earth 110m physical + cultural layers (public domain). Bundled for
-// M3; candidates for lazy-loading later (see status.md follow-ups).
+// M3; candidates for lazy-loading later (see STATUS.md follow-ups).
 export const lakes = lakesRaw as unknown as FeatureCollection<Geometry>;
 export const rivers = riversRaw as unknown as FeatureCollection<Geometry>;
 

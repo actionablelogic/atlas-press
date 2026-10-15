@@ -46,7 +46,7 @@ export function fitWorld(
 
 /**
  * Center + fit a gazetteer region. Rotation strategy depends on the
- * projection's capability (prj.md §5.1 / §5.3):
+ * projection's capability (PRD.md §5.1 / §5.3):
  *  - azimuthals rotate freely to put the centroid at the projection center,
  *  - conics rotate λ, center φ, and derive standard parallels via the ⅙ rule,
  *  - world pseudo-cylindricals only rotate λ (rotating φ looks wrong).

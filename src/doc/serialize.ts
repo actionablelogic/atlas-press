@@ -1,4 +1,4 @@
-// MapDocument (de)serialization for URL-hash sharing + save/load (prj.md §5.8).
+// MapDocument (de)serialization for URL-hash sharing + save/load (PRD.md §5.8).
 // No accounts, no server. The API key is intentionally NOT serialized.
 
 import type { ProjectionId } from "../geo/projections";

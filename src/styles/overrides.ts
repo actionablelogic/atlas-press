@@ -1,4 +1,4 @@
-// User customizations layered on top of a style preset (prj.md §5.4). A style
+// User customizations layered on top of a style preset (PRD.md §5.4). A style
 // is a preset + this diff; the renderer only ever sees the resolved StyleDef
 // produced by applyOverrides(). Stored in MapDocument as `styleOverrides`.
 

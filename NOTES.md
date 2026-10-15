@@ -1,7 +1,7 @@
 # NOTES.md — rendering & architecture decisions
 
 Running log of tuning decisions (stroke widths, palettes, projection quirks)
-that will be revisited repeatedly, per the suggestion in `prj.md` §7.
+that will be revisited repeatedly, per the suggestion in `PRD.md` §7.
 
 ## M7 — Polish
 
@@ -130,7 +130,7 @@ that will be revisited repeatedly, per the suggestion in `prj.md` §7.
   `sourceId/z/x/y`. No eviction yet.
 - EOX WMTS uses `.../g/{z}/{y}/{x}.jpg` (TileMatrix/Row/Col = z/y/x). Default source
   is **CC-BY-NC-SA (non-commercial)** — the license/attribution is shown in the
-  settings panel and as a map-corner credit (prj.md §8).
+  settings panel and as a map-corner credit (PRD.md §8).
 
 ### renderMap decoupling
 - `renderMap` no longer knows about WebGL. Raster layers call a host-provided
@@ -142,7 +142,7 @@ that will be revisited repeatedly, per the suggestion in `prj.md` §7.
 ### Preset + diff model (`styles/overrides.ts`)
 - A style = **preset (`StyleDef`) + `StyleOverrides` diff**. `applyOverrides()`
   resolves them into a single `StyleDef`; the renderer never sees overrides.
-  `MapDocument.styleOverrides` (per the updated prj.md) will serialize the diff.
+  `MapDocument.styleOverrides` (per the updated PRD.md) will serialize the diff.
 - Layers are rebuilt in a fixed canonical render order (`CONTENT_ORDER`) so a
   toggleable layer can be **added** (from `LAYER_CATALOG` defaults) or **removed**,
   not just tweaked. Preset-only layers (background/sphere/raster/coastVignette)
@@ -169,14 +169,14 @@ that will be revisited repeatedly, per the suggestion in `prj.md` §7.
   verified rendering with a magenta pixel probe during dev).
 
 ### Fonts
-- 6 OFL families bundled as latin-subset woff2 in `public/fonts/` (+ `fonts.css`
+- 6 families (5 SIL OFL + Roboto Slab, Apache 2.0) bundled as latin-subset woff2 in `public/fonts/` (+ `fonts.css`
   linked from index.html) — not CDN, so worker-side export/offline will work.
   Canvas won't lazily fetch a webfont, so MapCanvas force-loads them
   (`document.fonts.load`) then redraws. Small-caps via `ctx.fontVariantCaps`.
 
 ### Notes
 - Background is drawn full-canvas before the sphere, so "background color outside
-  the sphere/outline" (prj.md M4a note) is already plumbed and now user-overridable.
+  the sphere/outline" (PRD.md M4a note) is already plumbed and now user-overridable.
 - coastVignette fills the land silhouette (relying on fills/land to cover it); with
   fills toggled off it shows as muddy grey land. It isn't a spec toggle — acceptable
   "passable" per the exit test; a glow-only vignette is a follow-up.
@@ -223,7 +223,7 @@ that will be revisited repeatedly, per the suggestion in `prj.md` §7.
   Regenerate: unzip TIF, then `sharp(tif,{limitInputPixels:false}).resize(5400,2700)
   .jpeg({quality:82})`.
 - Both public-domain / free-to-use → these raster posters are freely sellable
-  (unlike M4b's licensed Mercator tiles, prj.md §8).
+  (unlike M4b's licensed Mercator tiles, PRD.md §8).
 
 ### Headless verification
 - WebGL2 needs SwiftShader flags in headless Chromium:
@@ -253,7 +253,7 @@ that will be revisited repeatedly, per the suggestion in `prj.md` §7.
   fills so the fills cover the land and only the outward glow remains. Clipped to
   the sphere so it doesn't bleed past the map edge.
 
-### Labels (`render/labels.ts`, prj.md §5.5)
+### Labels (`render/labels.ts`, PRD.md §5.5)
 - Sources: gazetteer (oceans, countries) + NE populated places (capitals via
   `adm0cap`, cities by `pop_max`). Per-class `minScale` gates density by zoom
   (capitals appear ~scale 260, cities ~700).
@@ -361,7 +361,7 @@ that will be revisited repeatedly, per the suggestion in `prj.md` §7.
   - `lambda` / `lambdaPhi` (world pseudo-cylindricals, conics) → horizontal
     drag spins **longitude only** (`DEG_PER_PX / scale` sensitivity); vertical
     drag pans the poster via `translate.y`. Avoids the "wrong when rotated in φ"
-    look called out in `prj.md` §5.3.
+    look called out in `PRD.md` §5.3.
 - Wheel zoom keeps the point under the cursor fixed (linear scale+translate
   adjust). `scale` floored at 1.
 - Double-click re-centers on the clicked lon/lat — **azimuthals only** for now.

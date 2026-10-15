@@ -1,4 +1,4 @@
-// Poster aspect presets (prj.md §5.7). Base ratios are stored portrait
+// Poster aspect presets (PRD.md §5.7). Base ratios are stored portrait
 // (width ≤ height); the orientation toggle swaps them.
 
 export type Orientation = "portrait" | "landscape";
