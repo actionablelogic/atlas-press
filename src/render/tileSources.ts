@@ -1,17 +1,16 @@
 // Pluggable Web-Mercator XYZ tile sources for region-scale satellite (M4b).
-// Licensing matters (prj.md §8): the default (EOX Sentinel-2 cloudless) is
+// Licensing matters (PRD.md §8): the default (EOX Sentinel-2 cloudless) is
 // CC-BY-NC-SA — non-commercial. The UI shows the active source's attribution +
 // license next to export. A user can bring a commercially-licensed source/key.
 
 /**
- * Commercial-use classification for the printed poster (prj.md §8):
- *  - "sellable"     freely sellable (public domain / free incl. commercial)
- *  - "attribution"  sellable but attribution required — verify provider's print
- *                   terms (some providers restrict commercial/print use)
- *  - "personal"     personal use only (e.g. CC-BY-NC-SA — no commercial resale)
- *  - "unknown"      depends on the user's own source terms
+ * Licence terms governing posters made with a source (PRD.md §8):
+ *  - "open"            public domain / free for any use, no conditions
+ *  - "attribution"     free to use, attribution required; provider terms apply
+ *  - "non-commercial"  licence excludes commercial use (e.g. CC BY-NC-SA)
+ *  - "unknown"         depends on the user's own source terms
  */
-export type CommercialUse = "sellable" | "attribution" | "personal" | "unknown";
+export type UsageTerms = "open" | "attribution" | "non-commercial" | "unknown";
 
 export interface TileSource {
   id: string;
@@ -24,9 +23,9 @@ export interface TileSource {
   attribution: string;
   /** Short license note surfaced in the UI. */
   license: string;
-  /** Commercial-use classification for prints made with these tiles. */
-  commercial: CommercialUse;
-  /** One-line explanation of the commercial terms. */
+  /** Licence terms for posters made with these tiles. */
+  terms: UsageTerms;
+  /** One-line notice of the licence conditions. */
   usageNote: string;
   /** "imagery" = satellite tier; "basemap" = street/topo/etc. map tiles. */
   kind: "imagery" | "basemap";
@@ -48,8 +47,8 @@ export const BASEMAP_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "© OpenStreetMap contributors © CARTO",
     license: "CARTO basemaps — free with attribution",
-    commercial: "attribution",
-    usageNote: "Attribution required (OpenStreetMap ODbL + CARTO); heavy or commercial use may need a CARTO plan.",
+    terms: "attribution",
+    usageNote: "Attribution required (OpenStreetMap ODbL + CARTO). Use subject to CARTO's terms of service.",
     kind: "basemap",
   },
   {
@@ -61,8 +60,8 @@ export const BASEMAP_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "© OpenStreetMap contributors © CARTO",
     license: "CARTO basemaps — free with attribution",
-    commercial: "attribution",
-    usageNote: "Attribution required (OpenStreetMap ODbL + CARTO); heavy or commercial use may need a CARTO plan.",
+    terms: "attribution",
+    usageNote: "Attribution required (OpenStreetMap ODbL + CARTO). Use subject to CARTO's terms of service.",
     kind: "basemap",
   },
   {
@@ -74,8 +73,8 @@ export const BASEMAP_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "© OpenStreetMap contributors © CARTO",
     license: "CARTO basemaps — free with attribution",
-    commercial: "attribution",
-    usageNote: "Attribution required (OpenStreetMap ODbL + CARTO); heavy or commercial use may need a CARTO plan.",
+    terms: "attribution",
+    usageNote: "Attribution required (OpenStreetMap ODbL + CARTO). Use subject to CARTO's terms of service.",
     kind: "basemap",
   },
   {
@@ -88,8 +87,8 @@ export const BASEMAP_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "Esri, HERE, Garmin, USGS, NGA",
     license: "Esri — attribution required; see Esri terms for print",
-    commercial: "attribution",
-    usageNote: "Attribution required; verify Esri's terms before selling prints.",
+    terms: "attribution",
+    usageNote: "Attribution required. Use subject to Esri's terms of use.",
     kind: "basemap",
   },
   {
@@ -102,8 +101,8 @@ export const BASEMAP_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "National Geographic, Esri, Garmin, HERE, USGS, NASA",
     license: "Esri / NatGeo — attribution required; see terms for print",
-    commercial: "attribution",
-    usageNote: "Attribution required; verify Esri/NatGeo terms before selling prints.",
+    terms: "attribution",
+    usageNote: "Attribution required. Use subject to Esri and National Geographic terms of use.",
     kind: "basemap",
   },
   {
@@ -116,8 +115,8 @@ export const BASEMAP_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "Esri, GEBCO, NOAA, National Geographic, Garmin, HERE",
     license: "Esri — attribution required; see Esri terms for print",
-    commercial: "attribution",
-    usageNote: "Attribution required; verify Esri's terms before selling prints.",
+    terms: "attribution",
+    usageNote: "Attribution required. Use subject to Esri's terms of use.",
     kind: "basemap",
   },
   {
@@ -130,8 +129,8 @@ export const BASEMAP_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "Esri, HERE, Garmin, USGS, NGA, OpenStreetMap contributors",
     license: "Esri — attribution required; see Esri terms for print",
-    commercial: "attribution",
-    usageNote: "Attribution required; verify Esri's terms before selling prints.",
+    terms: "attribution",
+    usageNote: "Attribution required. Use subject to Esri's terms of use.",
     kind: "basemap",
   },
 ];
@@ -147,8 +146,8 @@ export const TILE_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "Sentinel-2 cloudless 2020 by EOX IT Services GmbH",
     license: "CC-BY-NC-SA 4.0 — non-commercial",
-    commercial: "personal",
-    usageNote: "Personal use only — no commercial resale of prints (CC-BY-NC-SA).",
+    terms: "non-commercial",
+    usageNote: "Licensed CC BY-NC-SA 4.0: attribution required, non-commercial use only, derivatives under the same licence.",
     kind: "imagery",
   },
   {
@@ -161,8 +160,8 @@ export const TILE_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "Esri, Maxar, Earthstar Geographics",
     license: "Esri — attribution required; see Esri terms for print",
-    commercial: "attribution",
-    usageNote: "Attribution required; verify Esri's terms before selling prints.",
+    terms: "attribution",
+    usageNote: "Attribution required. Use subject to Esri's terms of use.",
     kind: "imagery",
   },
   {
@@ -174,8 +173,8 @@ export const TILE_SOURCES: TileSource[] = [
     tileSize: 256,
     attribution: "User-supplied source",
     license: "Per your source's terms",
-    commercial: "unknown",
-    usageNote: "Rights depend entirely on your tile source's licence.",
+    terms: "unknown",
+    usageNote: "Use is governed by your tile source's licence.",
     kind: "imagery",
     requiresKey: true,
   },
