@@ -7,6 +7,14 @@ Pick a region (country, continent, ocean), a projection and a style, rotate the
 globe to frame it, decorate it with overlays, and export a print-ready image up
 to 2 × A0.
 
+![Atlas Press editor: Orthographic projection, Satellite style](docs/screenshots/app.jpg)
+
+<p align="center">
+  <img src="docs/screenshots/poster-asia.jpg" alt="Exported poster: Asia in the Classic Atlas style, with graticule, reference lines and compass rose" width="600">
+  <br>
+  <em>Exported poster: Asia, Classic Atlas style.</em>
+</p>
+
 ## Features
 
 - **9 projections**: Equal Earth, Robinson, Winkel Tripel, Mollweide, Hobo–Dyer,
